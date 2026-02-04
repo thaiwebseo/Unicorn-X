@@ -5,6 +5,10 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 function CheckoutContent() {
     const { data: session, status } = useSession();
@@ -61,7 +65,13 @@ function CheckoutContent() {
 
     const handleCheckout = async () => {
         if (!isPrivacyChecked) {
-            alert('Please agree to the Terms and Conditions.');
+            MySwal.fire({
+                icon: 'warning',
+                title: 'Term & Privacy',
+                text: 'Please agree to the Terms and Conditions before proceeding.',
+                confirmButtonColor: '#06b6d4', // cyan-500
+                confirmButtonText: 'OK'
+            });
             return;
         }
         setLoading(true);
@@ -88,13 +98,37 @@ function CheckoutContent() {
                 window.location.href = url;
             } else {
                 const errorText = await response.text();
-                console.error('Checkout failed:', response.status, errorText);
-                alert(`Checkout failed: ${response.status} ${errorText}`);
+                // Special handling for quota error
+                if (response.status === 400 && errorText.includes('quota')) {
+                    MySwal.fire({
+                        icon: 'error',
+                        title: 'Trial Limit Reached',
+                        text: 'You have already used your one-time free trial account quota. Please choose a subscription plan to continue.',
+                        confirmButtonColor: '#06b6d4',
+                        confirmButtonText: 'View Plans'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            window.location.href = '/#pricing'; // Redirect to pricing
+                        }
+                    });
+                } else {
+                    MySwal.fire({
+                        icon: 'error',
+                        title: 'Checkout Failed',
+                        text: errorText || 'Something went wrong. Please try again.',
+                        confirmButtonColor: '#f43f5e', // rose-500
+                    });
+                }
                 setLoading(false);
             }
         } catch (error) {
             console.error('Error:', error);
-            alert(`An unexpected error occurred: ${error}`);
+            MySwal.fire({
+                icon: 'error',
+                title: 'Network Error',
+                text: 'An unexpected error occurred. Please check your connection.',
+                confirmButtonColor: '#f43f5e',
+            });
             setLoading(false);
         }
     };

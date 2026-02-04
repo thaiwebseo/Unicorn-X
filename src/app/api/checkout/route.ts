@@ -90,9 +90,10 @@ export async function POST(req: Request) {
         const { isTrial } = body;
         if (isTrial) {
             // Check if user has already used trial for this category
+            // Check if user has already used ANY free trial
             const trialUsedCategories = (user as any).trialUsedCategories || [];
-            if (trialUsedCategories.includes(plan.category)) {
-                return new NextResponse('You have already used the free trial for this category.', { status: 400 });
+            if (trialUsedCategories.length > 0) {
+                return new NextResponse('You have already used your one-time free trial account quota.', { status: 400 });
             }
 
             // Enforce Stripe Trial requirements
