@@ -148,9 +148,10 @@ export async function POST(req: Request) {
                 where: { id: existingSubscriptionForPlan.id },
                 data: {
                     status: 'ACTIVE',
+                    isTrial: false, // Convert to paid if was trial
                     endDate: newEndDate,
                     stripeSessionId: sessionId // Update to track this most recent payment
-                }
+                } as any
             });
 
             // Handle Bot for Renewal (Reuse existing or provision missing)
@@ -158,9 +159,25 @@ export async function POST(req: Request) {
             let lastProcessedBot = null;
 
             for (const botName of botsToCreate) {
+                // Try to find regular bot OR trial bot
                 let existingBot = await prisma.bot.findFirst({
                     where: { userId: user.id, name: botName }
                 });
+
+                // If not found, look for trial version
+                const trialName = `${botName} (Trial)`;
+                let trialBot = await prisma.bot.findFirst({
+                    where: { userId: user.id, name: trialName }
+                });
+
+                if (trialBot && !existingBot) {
+                    // CONVERT: Rename Trial bot to Regular bot
+                    existingBot = await prisma.bot.update({
+                        where: { id: trialBot.id },
+                        data: { name: botName }
+                    });
+                    console.log(`✨ Converted Trial bot '${trialName}' to Regular bot '${botName}' for user ${user.id}`);
+                }
 
                 if (!existingBot) {
                     existingBot = await prisma.bot.create({

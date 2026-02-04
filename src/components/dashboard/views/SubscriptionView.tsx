@@ -141,7 +141,8 @@ export default function SubscriptionView({ onViewHistory }: SubscriptionViewProp
                                 const durationDay = (new Date(sub.endDate).getTime() - new Date(sub.startDate).getTime()) / (1000 * 3600 * 24);
                                 const isTrial = sub.isTrial === true || durationDay < 15; // Fallback for existing trials
                                 const yearly = isYearly(sub.startDate, sub.endDate);
-                                const price = isTrial ? 0 : (yearly ? sub.plan?.priceYearly : sub.plan?.priceMonthly);
+                                const actualPrice = yearly ? sub.plan?.priceYearly : sub.plan?.priceMonthly;
+                                const displayPrice = isTrial ? 0 : actualPrice;
                                 const isPlanActive = sub.plan?.isActive !== false; // Default to true if undefined
 
                                 return (
@@ -172,14 +173,14 @@ export default function SubscriptionView({ onViewHistory }: SubscriptionViewProp
                                             {/* Mobile Price Display (shown on mobile instead of separate section) */}
                                             <div className="text-right md:hidden">
                                                 <p className="text-[10px] uppercase tracking-wider font-bold text-slate-900">{yearly ? 'Yearly' : 'Monthly'}</p>
-                                                <p className="text-lg font-black text-cyan-500 leading-none">${(price || 0).toFixed(0)}</p>
+                                                <p className="text-lg font-black text-cyan-500 leading-none">${(displayPrice || 0).toFixed(0)}</p>
                                             </div>
                                         </div>
 
                                         {/* Desktop Price Display */}
                                         <div className="hidden md:block text-right">
                                             <p className="text-xs uppercase tracking-wider font-bold text-slate-900">{yearly ? 'Yearly' : 'Monthly'}</p>
-                                            <p className="text-2xl font-black text-cyan-500 leading-tight">${(price || 0).toFixed(0)}</p>
+                                            <p className="text-2xl font-black text-cyan-500 leading-tight">${(displayPrice || 0).toFixed(0)}</p>
                                         </div>
 
                                         <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t border-slate-50 md:border-0">
@@ -200,11 +201,14 @@ export default function SubscriptionView({ onViewHistory }: SubscriptionViewProp
                                                 <button
                                                     onClick={() => {
                                                         const fullPlanName = sub.plan.name;
+                                                        // Strip " (Trial)" if it was added to the display name logic elsewhere or if it's in the sub.plan.name
+                                                        const cleanPlanName = fullPlanName.replace(/\s\(Trial\)$/, '');
+
                                                         const params = new URLSearchParams({
-                                                            plan: fullPlanName,
-                                                            price: price.toString(),
+                                                            plan: cleanPlanName,
+                                                            price: actualPrice.toString(),
                                                             type: yearly ? 'yearly' : 'monthly',
-                                                            id: yearly ? 'yearly' : 'monthly',
+                                                            id: sub.plan.id, // Use actual Plan ID
                                                             isRenewal: 'true'
                                                         });
                                                         window.location.href = `/checkout?${params.toString()}`;
