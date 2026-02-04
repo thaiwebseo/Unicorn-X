@@ -56,7 +56,10 @@ export async function GET() {
                     ? sub.plan.includedBots
                     : [sub.plan.name];
 
-                if (targets.includes(bot.name)) {
+                // Normalize bot name for matching (strip " (Trial)" suffix if present)
+                const normalizedBotName = bot.name.replace(/\s\(Trial\)$/, '');
+
+                if (targets.includes(normalizedBotName)) {
                     const botTime = new Date(bot.createdAt).getTime();
                     const subTime = new Date(sub.createdAt).getTime();
                     const diff = Math.abs(botTime - subTime);

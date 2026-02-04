@@ -19,6 +19,7 @@ interface Subscription {
     status: string;
     startDate: string;
     endDate: string;
+    isTrial?: boolean;
     plan: Plan;
 }
 
@@ -137,8 +138,10 @@ export default function SubscriptionView({ onViewHistory }: SubscriptionViewProp
                             </div>
                         ) : (
                             activeSubscriptions.map((sub) => {
+                                const durationDay = (new Date(sub.endDate).getTime() - new Date(sub.startDate).getTime()) / (1000 * 3600 * 24);
+                                const isTrial = sub.isTrial === true || durationDay < 15; // Fallback for existing trials
                                 const yearly = isYearly(sub.startDate, sub.endDate);
-                                const price = yearly ? sub.plan?.priceYearly : sub.plan?.priceMonthly;
+                                const price = isTrial ? 0 : (yearly ? sub.plan?.priceYearly : sub.plan?.priceMonthly);
                                 const isPlanActive = sub.plan?.isActive !== false; // Default to true if undefined
 
                                 return (
@@ -149,7 +152,12 @@ export default function SubscriptionView({ onViewHistory }: SubscriptionViewProp
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-base md:text-xl font-bold text-slate-800 line-clamp-1 flex items-center gap-2">
-                                                    {sub.plan?.name || 'Subscription'}
+                                                    {sub.plan?.name || 'Subscription'} {isTrial ? '(Trial)' : ''}
+                                                    {isTrial && (
+                                                        <span className="px-2 py-0.5 bg-cyan-100 text-cyan-600 text-[10px] md:text-xs rounded-full font-bold uppercase tracking-wide border border-cyan-200">
+                                                            Free Trial
+                                                        </span>
+                                                    )}
                                                     {!isPlanActive && (
                                                         <span className="px-2 py-0.5 bg-red-100 text-red-600 text-[10px] md:text-xs rounded-full font-bold uppercase tracking-wide border border-red-200">
                                                             Discontinued

@@ -17,6 +17,7 @@ function CheckoutContent() {
     const planType = searchParams.get('type') || 'monthly';
     const planId = searchParams.get('id') || 'monthly';
     const isRenewal = searchParams.get('isRenewal') === 'true';
+    const isTrial = searchParams.get('isTrial') === 'true';
     const referralCode = searchParams.get('ref') || ''; // Get ref code
 
     const [loading, setLoading] = useState(false);
@@ -77,6 +78,7 @@ function CheckoutContent() {
                     firstName,
                     lastName,
                     isRenewal,
+                    isTrial,
                     ref: referralCode // Forward to API
                 }),
             });

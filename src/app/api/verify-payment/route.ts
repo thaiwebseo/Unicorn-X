@@ -183,18 +183,37 @@ export async function POST(req: Request) {
             console.log(`✨ Processing New Subscription for User ${user.id}, Plan ${plan.name}`);
 
             const startDate = new Date();
-            const endDate = new Date();
-            endDate.setMonth(endDate.getMonth() + durationMonths);
+            let endDate = new Date();
+
+            const isTrial = checkoutSession.metadata?.isTrial === 'true';
+
+            if (isTrial) {
+                endDate.setDate(endDate.getDate() + 7); // 7-Day Trial
+
+                // Record that user has used this trial
+                const category = checkoutSession.metadata?.category;
+                if (category) {
+                    await prisma.user.update({
+                        where: { id: user.id },
+                        data: {
+                            trialUsedCategories: { push: category }
+                        } as any // Cast to any to bypass outdated generated client
+                    });
+                }
+            } else {
+                endDate.setMonth(endDate.getMonth() + durationMonths);
+            }
 
             subscription = await prisma.subscription.create({
                 data: {
                     userId: user.id,
                     planId: plan.id,
+                    isTrial,
                     status: 'ACTIVE',
                     startDate,
                     endDate,
                     stripeSessionId: sessionId
-                }
+                } as any
             });
 
             // Create Bots for the user (Support Bundles)
@@ -202,16 +221,17 @@ export async function POST(req: Request) {
             let lastProcessedBot = null;
 
             for (const botName of botsToCreate) {
+                const finalBotName = isTrial ? `${botName} (Trial)` : botName;
                 const newBot = await prisma.bot.create({
                     data: {
                         userId: user.id,
-                        name: botName,
+                        name: finalBotName,
                         apiKey: '',
                         secretKey: '',
                         status: BotStatus.WAITING_FOR_SETUP
                     }
                 });
-                console.log(`🤖 Provisioned bot '${botName}' for user ${user.id}`);
+                console.log(`🤖 Provisioned bot '${finalBotName}' for user ${user.id}`);
                 lastProcessedBot = newBot;
             }
             bot = lastProcessedBot;

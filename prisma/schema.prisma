@@ -45,6 +45,7 @@ model User {
   subscriptions Subscription[]
   bots          Bot[]
   orders        Order[]
+  trialUsedCategories String[]   @default([]) // Track which categories user has already trialed
 
   @@map("users")
 }
@@ -74,6 +75,7 @@ model Subscription {
   startDate       DateTime
   endDate         DateTime
   stripeSessionId String?            @unique
+  isTrial         Boolean            @default(false)
   activatedAt     DateTime?          // Track when the subscription was first activated
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt

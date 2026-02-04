@@ -77,7 +77,7 @@ const Pricing = () => {
         fetchPlans();
     }, []);
 
-    const handleSubscribe = (plan: typeof pricingData[PricingCategory][0]) => {
+    const handleSubscribe = (plan: typeof pricingData[PricingCategory][0], isTrial = false) => {
         setLoadingPlan(plan.name);
 
         // Combine category with tier for full plan name (e.g., "Smart Timer DCA - Starter")
@@ -95,9 +95,10 @@ const Pricing = () => {
         // Redirect to intermediate checkout page
         const params = new URLSearchParams({
             plan: fullPlanName,
-            price: billingCycle === 'monthly' ? plan.priceMonthly.toString() : plan.priceYearly.toString(),
+            price: isTrial ? '0.00' : (billingCycle === 'monthly' ? plan.priceMonthly.toString() : plan.priceYearly.toString()),
             type: billingCycle,
-            id: dbPlan?.id || 'monthly' // Use real ID if found, otherwise fallback
+            id: dbPlan?.id || 'monthly', // Use real ID if found, otherwise fallback
+            isTrial: isTrial ? 'true' : 'false'
         });
 
         window.location.href = `/checkout?${params.toString()}`;
@@ -241,6 +242,16 @@ const Pricing = () => {
                                     'Get Started'
                                 )}
                             </button>
+
+                            {/* Free Trial Button */}
+                            {activeCategory !== 'Bundles' && (
+                                <button
+                                    onClick={() => handleSubscribe(plan, true)}
+                                    className="w-full mt-3 py-2 text-sm font-bold text-cyan-600 hover:text-cyan-700 hover:underline transition-all"
+                                >
+                                    Start 7-Day Free Trial
+                                </button>
+                            )}
 
                             {/* Features */}
                             <div className="mt-8">

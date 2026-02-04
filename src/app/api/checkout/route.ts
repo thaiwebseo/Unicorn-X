@@ -24,7 +24,7 @@ export async function POST(req: Request) {
             });
         }
 
-        if (!planId || !price) {
+        if (!planId || price === undefined || price === null) {
             return new NextResponse('Missing required fields', { status: 400 });
         }
 
@@ -86,6 +86,22 @@ export async function POST(req: Request) {
         // Get Referral ID from body
         const { ref } = body;
 
+        // Check for Trial Eligibility
+        const { isTrial } = body;
+        if (isTrial) {
+            // Check if user has already used trial for this category
+            const trialUsedCategories = (user as any).trialUsedCategories || [];
+            if (trialUsedCategories.includes(plan.category)) {
+                return new NextResponse('You have already used the free trial for this category.', { status: 400 });
+            }
+
+            // Enforce Stripe Trial requirements
+            // 1. Must use 'subscription' mode
+            if (mode !== 'subscription') {
+                return new NextResponse('Free trial is only available for subscription plans.', { status: 400 });
+            }
+        }
+
         const checkoutSession = await stripe.checkout.sessions.create({
             payment_method_types: paymentMethodTypes,
             line_items: [
@@ -93,7 +109,7 @@ export async function POST(req: Request) {
                     price_data: {
                         currency: 'usd',
                         product_data: {
-                            name: productName,
+                            name: productName + (isTrial ? ' (7-Day Free Trial)' : ''),
                         },
                         unit_amount: unitAmount,
                         recurring: recurring,
@@ -102,6 +118,13 @@ export async function POST(req: Request) {
                 },
             ],
             mode: mode,
+            subscription_data: isTrial ? {
+                trial_period_days: 7,
+                metadata: {
+                    isTrial: 'true',
+                    category: plan.category
+                }
+            } : undefined,
             success_url: successUrl,
             cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/subscription?canceled=true`,
             customer_email: session.user.email!,
@@ -110,7 +133,9 @@ export async function POST(req: Request) {
                 planId: planId,
                 planName: productName,
                 planType: type,
-                refId: ref || ''
+                refId: ref || '',
+                isTrial: isTrial ? 'true' : 'false',
+                category: plan.category
             }
         });
 
