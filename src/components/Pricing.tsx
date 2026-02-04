@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, MonitorPlay, Clock, Link2, Infinity } from 'lucide-react';
 
 type PlanTier = {
@@ -60,6 +60,22 @@ const Pricing = () => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
     const [activeCategory, setActiveCategory] = useState<PricingCategory>('Smart Timer DCA');
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+    const [dbPlans, setDbPlans] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const res = await fetch('/api/plans');
+                if (res.ok) {
+                    const data = await res.json();
+                    setDbPlans(data);
+                }
+            } catch (error) {
+                console.error('Error fetching plans:', error);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     const handleSubscribe = (plan: typeof pricingData[PricingCategory][0]) => {
         setLoadingPlan(plan.name);
@@ -67,12 +83,21 @@ const Pricing = () => {
         // Combine category with tier for full plan name (e.g., "Smart Timer DCA - Starter")
         const fullPlanName = `${activeCategory} - ${plan.name}`;
 
+        // Find the actual plan ID from the database plans
+        // In the DB, 'Bundles' tier might be 'Starter Bundle' instead of just 'Starter'
+        const dbPlan = dbPlans.find(p => {
+            const matchesCategory = p.category === activeCategory;
+            const matchesTier = p.tier.toLowerCase() === plan.name.toLowerCase() ||
+                p.tier.toLowerCase().includes(plan.name.toLowerCase());
+            return matchesCategory && matchesTier;
+        });
+
         // Redirect to intermediate checkout page
         const params = new URLSearchParams({
             plan: fullPlanName,
             price: billingCycle === 'monthly' ? plan.priceMonthly.toString() : plan.priceYearly.toString(),
             type: billingCycle,
-            id: billingCycle === 'monthly' ? 'monthly' : 'yearly' // Simplified ID mapping
+            id: dbPlan?.id || 'monthly' // Use real ID if found, otherwise fallback
         });
 
         window.location.href = `/checkout?${params.toString()}`;
@@ -115,6 +140,22 @@ const Pricing = () => {
                     <p className="text-slate-600 mt-2">
                         {categoryDescriptions[activeCategory]}
                     </p>
+                    <div className="mt-3">
+                        {activeCategory !== 'Bundles' && (
+                            <a
+                                href={
+                                    activeCategory === 'Smart Timer DCA' ? '/timer-dca' :
+                                        activeCategory === 'Bollinger Band DCA' ? '/bollinger-dca' :
+                                            activeCategory === 'MVRV Smart DCA' ? '/mvrv-cycle-dca' :
+                                                activeCategory === 'Ultimate DCA Max' ? '/pro-multi-dca' : '#'
+                                }
+                                className="inline-flex items-center gap-1.5 text-sm font-bold text-cyan-500 hover:text-cyan-600 transition-colors group"
+                            >
+                                Learn more about {activeCategory}
+                                <Link2 size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                            </a>
+                        )}
+                    </div>
                 </div>
 
                 {/* Billing Toggle - Pill Button Style */}
