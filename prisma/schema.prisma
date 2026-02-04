@@ -1,0 +1,118 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum BotStatus {
+  WAITING_FOR_SETUP  // Customer hasn't set API/Secret Key yet
+  SETTING_UP         // API submitted, waiting for admin verification
+  READY              // Admin approved, ready to use
+  RUNNING            // Active and executing trades
+  PAUSED             // Temporarily paused
+  SUSPENDED          // Subscription expired
+  ERROR              // Connection/configuration error
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String         @map("password_hash")
+  role          Role           @default(USER)
+  status        String         @default("ACTIVE") // ACTIVE, SUSPENDED
+  adminNotes    String?        @map("admin_notes")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  subscriptions Subscription[]
+  bots          Bot[]
+  orders        Order[]
+
+  @@map("users")
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  name         String
+  category     String   // 'Smart Timer DCA', 'Bundles', etc.
+  tier         String   // 'Starter', 'Pro', 'Expert'
+  priceMonthly Float
+  priceYearly  Float
+  features     String[] // Array of strings for features
+  includedBots String[] @default([]) // Array of bot types included in this plan
+  isActive     Boolean  @default(true)
+
+  subscriptions Subscription[]
+
+  @@unique([name, category, tier])
+  @@map("plans")
+}
+
+model Subscription {
+  id              String             @id @default(uuid())
+  userId          String
+  planId          String
+  status          SubscriptionStatus
+  startDate       DateTime
+  endDate         DateTime
+  stripeSessionId String?            @unique
+  activatedAt     DateTime?          // Track when the subscription was first activated
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  plan Plan @relation(fields: [planId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Bot {
+  id               String    @id @default(uuid())
+  userId           String
+  name             String
+  status           BotStatus @default(WAITING_FOR_SETUP)
+  apiKey           String    // Encrypted
+  secretKey        String    // Encrypted
+  webhookUrl       String?
+  tradingViewEmail String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("bots")
+}
+
+model Order {
+  id              String   @id @default(uuid())
+  userId          String
+  amount          Float
+  planName        String?
+  paymentMethod   String?
+  stripeSessionId String?  @unique
+  status          String   // 'PENDING', 'PAID', 'FAILED'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("orders")
+}

@@ -1,0 +1,167 @@
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+
+export async function GET() {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session?.user?.email) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        });
+
+        if (!user) {
+            return new NextResponse('User not found', { status: 404 });
+        }
+
+        // Fetch bots
+        const bots = await prisma.bot.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Fetch active and cancelled subscriptions to map expiration dates
+        const subscriptions = await prisma.subscription.findMany({
+            where: {
+                userId: user.id,
+                status: {
+                    in: ['ACTIVE', 'CANCELLED']
+                }
+            },
+            include: {
+                plan: true
+            },
+            orderBy: {
+                endDate: 'desc'
+            }
+        });
+
+        // Match bots to subscriptions (1-to-1 logic)
+        const remainingSubs = [...subscriptions];
+        const botsWithExpiry = bots.map(bot => {
+            // Find a subscription that could contain this bot
+            // 1. Matches plan name exactly
+            // 2. OR bot name is in includedBots
+
+            let bestSubIndex = -1;
+            let minTimeDiff = Infinity;
+
+            remainingSubs.forEach((sub, index) => {
+                const targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
+                    ? sub.plan.includedBots
+                    : [sub.plan.name];
+
+                if (targets.includes(bot.name)) {
+                    const botTime = new Date(bot.createdAt).getTime();
+                    const subTime = new Date(sub.createdAt).getTime();
+                    const diff = Math.abs(botTime - subTime);
+
+                    if (diff < minTimeDiff) {
+                        minTimeDiff = diff;
+                        bestSubIndex = index;
+                    }
+                }
+            });
+
+            if (bestSubIndex !== -1) {
+                const sub = remainingSubs[bestSubIndex];
+                // We don't splice remainingSubs here because a bundle sub can have multiple bots.
+                // Instead, we just use it. If multiple bots match, they'll all pick the closest sub.
+                // Since we order subs by endDate desc, this is usually what we want.
+
+                return {
+                    ...bot,
+                    expirationDate: sub.endDate || null,
+                    isActivated: !!sub.activatedAt
+                };
+            }
+
+            return {
+                ...bot,
+                expirationDate: null,
+                isActivated: false
+            };
+        });
+
+        return NextResponse.json(botsWithExpiry);
+    } catch (error) {
+        console.error('[BOTS_GET_ERROR]', error);
+        return new NextResponse('Internal Error', { status: 500 });
+    }
+}
+
+export async function POST(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session?.user?.email) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        });
+
+        if (!user) {
+            return new NextResponse('User not found', { status: 404 });
+        }
+
+        const body = await req.json();
+        const { name, apiKey, secretKey, tradingViewEmail } = body;
+
+        const bot = await prisma.bot.create({
+            data: {
+                userId: user.id,
+                name: name || 'New Bot',
+                apiKey: apiKey || '',
+                secretKey: secretKey || '',
+                tradingViewEmail: tradingViewEmail || null,
+                status: 'SETTING_UP'
+            }
+        });
+
+        return NextResponse.json(bot);
+    } catch (error) {
+        console.error('[BOTS_POST_ERROR]', error);
+        return new NextResponse('Internal Error', { status: 500 });
+    }
+}
+
+export async function PUT(req: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session?.user?.email) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id, apiKey, secretKey, tradingViewEmail, webhookUrl, status } = body;
+
+        if (!id) {
+            return new NextResponse('Bot ID required', { status: 400 });
+        }
+
+        const updateData: any = {};
+        if (apiKey !== undefined) updateData.apiKey = apiKey;
+        if (secretKey !== undefined) updateData.secretKey = secretKey;
+        if (tradingViewEmail !== undefined) updateData.tradingViewEmail = tradingViewEmail;
+        if (webhookUrl !== undefined) updateData.webhookUrl = webhookUrl;
+        if (status !== undefined) updateData.status = status;
+
+        const bot = await prisma.bot.update({
+            where: { id },
+            data: updateData
+        });
+
+        return NextResponse.json(bot);
+    } catch (error) {
+        console.error('[BOTS_PUT_ERROR]', error);
+        return new NextResponse('Internal Error', { status: 500 });
+    }
+}
