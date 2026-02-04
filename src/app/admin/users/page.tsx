@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Search, User as UserIcon, Bot, MoreVertical, Eye, Edit2, ShieldAlert, History, X, Save, Check, Copy, ExternalLink, Mail, Calendar, Key } from 'lucide-react';
+import { Search, User as UserIcon, Bot, MoreVertical, Eye, Edit2, ShieldAlert, History, X, Save, Check, Copy, ExternalLink, Mail, Calendar, Key, RefreshCcw } from 'lucide-react';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 import Link from 'next/link';
 import PasswordVerificationModal from '@/components/PasswordVerificationModal';
 
@@ -46,6 +50,7 @@ export default function UsersManagement() {
         adminNotes: ''
     });
     const [saving, setSaving] = useState(false);
+    const [resetting, setResetting] = useState(false);
 
     // Security
     const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -104,6 +109,77 @@ export default function UsersManagement() {
             alert('Error updating user');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleResetUser = async () => {
+        if (!selectedUser) return;
+
+        const result = await MySwal.fire({
+            title: 'DANGER ZONE',
+            text: `Are you sure you want to PERMANENTLY RESET data for ${selectedUser.email}? All bots, subscriptions, and orders will be deleted. This cannot be undone.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, Wipe Everything!',
+            background: '#fff',
+            customClass: {
+                popup: 'rounded-2xl border-none shadow-xl',
+                title: 'text-red-600 font-black',
+                confirmButton: 'rounded-xl px-6 py-2.5 font-bold',
+                cancelButton: 'rounded-xl px-6 py-2.5 font-bold'
+            }
+        });
+
+        if (!result.isConfirmed) return;
+
+        // Double check confirmation for safety
+        const secondResult = await MySwal.fire({
+            title: 'Final Confirmation',
+            text: "Type 'RESET' to confirm permanent deletion.",
+            input: 'text',
+            inputPlaceholder: 'RESET',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Confirm Reset',
+            preConfirm: (value) => {
+                if (value !== 'RESET') {
+                    Swal.showValidationMessage("Please type 'RESET' exactly");
+                    return false;
+                }
+                return true;
+            }
+        });
+
+        if (!secondResult.isConfirmed) return;
+
+        setResetting(true);
+        try {
+            const res = await fetch('/api/admin/users/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: selectedUser.id })
+            });
+
+            if (res.ok) {
+                MySwal.fire({
+                    title: 'Wiped!',
+                    text: 'User data has been completely reset.',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                setIsProfileModalOpen(false);
+                fetchUsers();
+            } else {
+                const err = await res.text();
+                MySwal.fire('Error', err, 'error');
+            }
+        } catch (error) {
+            MySwal.fire('Error', 'Unexpected error occurred', 'error');
+        } finally {
+            setResetting(false);
         }
     };
 
@@ -291,21 +367,31 @@ export default function UsersManagement() {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
                             <button
-                                onClick={() => setIsProfileModalOpen(false)}
-                                className="px-6 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors"
+                                onClick={handleResetUser}
+                                disabled={resetting || saving}
+                                className="px-5 py-2.5 text-red-600 font-bold hover:bg-red-50 rounded-xl transition-colors flex items-center gap-2 border border-red-100"
                             >
-                                Cancel
+                                {resetting ? <span className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" /> : <RefreshCcw size={18} />}
+                                Reset User Data
                             </button>
-                            <button
-                                onClick={handleSaveProfile}
-                                disabled={saving}
-                                className="px-8 py-2.5 bg-cyan-500 text-white font-bold rounded-xl hover:bg-cyan-600 shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
-                            >
-                                {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={18} />}
-                                Save Changes
-                            </button>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setIsProfileModalOpen(false)}
+                                    className="px-6 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSaveProfile}
+                                    disabled={saving || resetting}
+                                    className="px-8 py-2.5 bg-cyan-500 text-white font-bold rounded-xl hover:bg-cyan-600 shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
+                                >
+                                    {saving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={18} />}
+                                    Save Changes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

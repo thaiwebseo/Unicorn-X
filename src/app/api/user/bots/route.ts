@@ -52,9 +52,23 @@ export async function GET() {
             let minTimeDiff = Infinity;
 
             remainingSubs.forEach((sub, index) => {
-                const targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
-                    ? sub.plan.includedBots
-                    : [sub.plan.name];
+                let targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
+                    ? [...sub.plan.includedBots]
+                    : [];
+
+                // Fallback for Bundles if includedBots is empty (Matches verification logic)
+                if (targets.length === 0 && sub.plan.category === 'Bundles') {
+                    const tier = sub.plan.tier.toLowerCase();
+                    if (tier.includes('starter')) {
+                        targets = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
+                    } else if (tier.includes('pro')) {
+                        targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
+                    } else if (tier.includes('expert')) {
+                        targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
+                    }
+                }
+
+                if (targets.length === 0) targets = [sub.plan.name];
 
                 // Normalize bot name for matching (strip " (Trial)" suffix if present)
                 const normalizedBotName = bot.name.replace(/\s\(Trial\)$/, '');

@@ -309,11 +309,27 @@ export default function MyBotsView() {
 
     bundleSubscriptions.forEach(sub => {
         const bundleBotsForSub: Bot[] = [];
-        const targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
-            ? [...sub.plan.includedBots]
-            : [sub.plan.name]; // Fallback
 
-        // Iterate through required bots for this bundle
+        // 1. Determine target bot names for this bundle
+        let targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
+            ? [...sub.plan.includedBots]
+            : [];
+
+        // Fallback for Bundles if includedBots is empty (Matches backend logic)
+        if (targets.length === 0 && sub.plan.category === 'Bundles') {
+            const tier = sub.plan.tier.toLowerCase();
+            if (tier.includes('starter')) {
+                targets = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
+            } else if (tier.includes('pro')) {
+                targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
+            } else if (tier.includes('expert')) {
+                targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro', 'Sniper Bot - Pro'];
+            }
+        }
+
+        if (targets.length === 0) targets = [sub.plan.name]; // Fallback to plan name
+
+        // 2. Iterate through required bots for this bundle
         targets.forEach(targetName => {
             // Find all candidates with matching name
             const candidates = standaloneBots

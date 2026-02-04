@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, Fragment } from 'react';
-import { Search, Plus, Package, Edit2, Check, X, ShieldAlert, MoreVertical, Archive, Calendar } from 'lucide-react';
+import { Search, Plus, Package, Edit2, Check, X, ShieldAlert, MoreVertical, Archive, Calendar, Trash2 } from 'lucide-react';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 interface Plan {
     id: string;
@@ -103,15 +107,103 @@ export default function PackageManagement() {
             if (res.ok) {
                 setIsModalOpen(false);
                 fetchPlans();
+                MySwal.fire({
+                    title: 'Success!',
+                    text: `Plan ${editingPlan ? 'updated' : 'created'} successfully.`,
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false,
+                    background: '#fff',
+                    customClass: {
+                        popup: 'rounded-2xl border-none shadow-xl',
+                        title: 'text-slate-800 font-bold',
+                    }
+                });
             } else {
                 const error = await res.text();
-                alert(`Operation failed: ${error}`);
+                MySwal.fire({
+                    title: 'Operation Failed',
+                    text: error,
+                    icon: 'error',
+                    confirmButtonColor: '#0ea5e9'
+                });
             }
         } catch (error) {
             console.error(error);
-            alert('An unexpected error occurred');
+            MySwal.fire({
+                title: 'Error',
+                text: 'An unexpected error occurred',
+                icon: 'error',
+                confirmButtonColor: '#0ea5e9'
+            });
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        const result = await MySwal.fire({
+            title: 'Are you sure?',
+            text: "You won't be able to revert this! If users have subscriptions to this plan, it will be deactivated instead.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, delete it!',
+            background: '#fff',
+            customClass: {
+                popup: 'rounded-2xl border-none shadow-xl',
+                title: 'text-slate-800 font-bold',
+                confirmButton: 'rounded-xl px-6 py-2.5 font-bold',
+                cancelButton: 'rounded-xl px-6 py-2.5 font-bold'
+            }
+        });
+
+        if (!result.isConfirmed) return;
+
+        try {
+            const res = await fetch(`/api/admin/packages?id=${id}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                fetchPlans();
+                MySwal.fire({
+                    title: 'Deleted!',
+                    text: 'Plan has been removed.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            } else if (res.status === 409) {
+                const msg = await res.text();
+                fetchPlans();
+                MySwal.fire({
+                    title: 'Plan Deactivated',
+                    text: 'This plan could not be deleted because it is linked to existing subscriptions. It has been marked as INACTIVE instead to preserve database history.',
+                    icon: 'info',
+                    confirmButtonColor: '#0ea5e9',
+                    customClass: {
+                        popup: 'rounded-2xl border-none shadow-xl',
+                        title: 'text-slate-800 font-bold',
+                    }
+                });
+            } else {
+                const error = await res.text();
+                MySwal.fire({
+                    title: 'Delete Failed',
+                    text: error,
+                    icon: 'error',
+                    confirmButtonColor: '#0ea5e9'
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            MySwal.fire({
+                title: 'Error',
+                text: 'An unexpected error occurred',
+                icon: 'error'
+            });
         }
     };
 
@@ -271,8 +363,16 @@ export default function PackageManagement() {
                                                     <button
                                                         onClick={() => handleOpenModal(plan)}
                                                         className="p-2 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-xl transition-all hover:scale-110 active:scale-95"
+                                                        title="Edit Plan"
                                                     >
                                                         <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(plan.id)}
+                                                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all hover:scale-110 active:scale-95"
+                                                        title="Delete Plan"
+                                                    >
+                                                        <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                             </td>

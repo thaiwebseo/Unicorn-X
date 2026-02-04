@@ -100,3 +100,44 @@ export async function PUT(req: Request) {
         return new NextResponse(`Internal Error: ${error.message}`, { status: 500 });
     }
 }
+
+// DELETE: Remove a package
+export async function DELETE(req: Request) {
+    try {
+        const session = await getServerSession(authOptions) as any;
+        if (session?.user?.role !== 'ADMIN') {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const id = searchParams.get('id');
+
+        if (!id) {
+            return new NextResponse('Plan ID required', { status: 400 });
+        }
+
+        // Check for dependencies (Subscriptions)
+        const subCount = await prisma.subscription.count({
+            where: { planId: id }
+        });
+
+        if (subCount > 0) {
+            // If subscriptions exist, we can't delete it due to foreign key constraints
+            // Instead, we mark it as Inactive so it's hidden from users
+            await prisma.plan.update({
+                where: { id },
+                data: { isActive: false }
+            });
+            return new NextResponse('Plan has existing subscriptions. It has been deactivated instead of deleted to preserve history.', { status: 409 });
+        }
+
+        await prisma.plan.delete({
+            where: { id }
+        });
+
+        return new NextResponse('Deleted successfully', { status: 200 });
+    } catch (error: any) {
+        console.error("Error deleting plan:", error);
+        return new NextResponse(`Internal Error: ${error.message}`, { status: 500 });
+    }
+}

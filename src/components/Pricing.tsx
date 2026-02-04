@@ -81,23 +81,25 @@ const Pricing = () => {
         setLoadingPlan(plan.name);
 
         // Combine category with tier for full plan name (e.g., "Smart Timer DCA - Starter")
-        const fullPlanName = `${activeCategory} - ${plan.name}`;
-
         // Find the actual plan ID from the database plans
-        // In the DB, 'Bundles' tier might be 'Starter Bundle' instead of just 'Starter'
         const dbPlan = dbPlans.find(p => {
             const matchesCategory = p.category === activeCategory;
-            const matchesTier = p.tier.toLowerCase() === plan.name.toLowerCase() ||
-                p.tier.toLowerCase().includes(plan.name.toLowerCase());
-            return matchesCategory && matchesTier;
+            const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
+                p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
+                p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
+                plan.name.toLowerCase().includes(p.tier.toLowerCase());
+            return matchesCategory && tierMatches;
         });
+
+        // Use real DB name if found, otherwise fallback to hardcoded string
+        const finalPlanName = dbPlan ? dbPlan.name : `${activeCategory} - ${plan.name}`;
 
         // Redirect to intermediate checkout page
         const params = new URLSearchParams({
-            plan: fullPlanName,
+            plan: finalPlanName,
             price: isTrial ? '0.00' : (billingCycle === 'monthly' ? plan.priceMonthly.toString() : plan.priceYearly.toString()),
             type: billingCycle,
-            id: dbPlan?.id || 'monthly', // Use real ID if found, otherwise fallback
+            id: dbPlan?.id || 'monthly',
             isTrial: isTrial ? 'true' : 'false'
         });
 
@@ -216,7 +218,20 @@ const Pricing = () => {
                             <div className="mt-4">
                                 <div className="flex items-baseline text-slate-900">
                                     <span className="text-5xl font-extrabold tracking-tight">
-                                        ${billingCycle === 'monthly' ? plan.priceMonthly.toFixed(2) : plan.priceYearly.toFixed(2)}
+                                        ${(() => {
+                                            const dbPlan = dbPlans.find(p => {
+                                                const matchesCategory = p.category === activeCategory;
+                                                const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
+                                                    p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
+                                                    p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
+                                                    plan.name.toLowerCase().includes(p.tier.toLowerCase());
+                                                return matchesCategory && tierMatches;
+                                            });
+                                            if (dbPlan) {
+                                                return billingCycle === 'monthly' ? dbPlan.priceMonthly.toFixed(2) : dbPlan.priceYearly.toFixed(2);
+                                            }
+                                            return billingCycle === 'monthly' ? plan.priceMonthly.toFixed(2) : plan.priceYearly.toFixed(2);
+                                        })()}
                                     </span>
                                 </div>
                                 <p className="mt-1 text-slate-500">
@@ -257,12 +272,26 @@ const Pricing = () => {
                             <div className="mt-8">
                                 <p className="font-bold text-slate-900 mb-4">Features</p>
                                 <ul className="space-y-3">
-                                    {plan.features.map((feature) => (
-                                        <li key={feature} className="flex items-start text-sm text-slate-600">
-                                            <Check className="mr-3 h-5 w-5 flex-shrink-0 text-cyan-500" />
-                                            {feature}
-                                        </li>
-                                    ))}
+                                    {(() => {
+                                        const dbPlan = dbPlans.find(p => {
+                                            const matchesCategory = p.category === activeCategory;
+                                            const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
+                                                p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
+                                                p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
+                                                plan.name.toLowerCase().includes(p.tier.toLowerCase());
+                                            return matchesCategory && tierMatches;
+                                        });
+                                        const features = (dbPlan && dbPlan.features && dbPlan.features.length > 0)
+                                            ? dbPlan.features
+                                            : plan.features;
+
+                                        return features.map((feature: string) => (
+                                            <li key={feature} className="flex items-start text-sm text-slate-600">
+                                                <Check className="mr-3 h-5 w-5 flex-shrink-0 text-cyan-500" />
+                                                {feature}
+                                            </li>
+                                        ));
+                                    })()}
                                 </ul>
                             </div>
                         </div>
