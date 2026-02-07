@@ -61,7 +61,48 @@ export async function POST(req: Request) {
             } as any
         });
 
-        return NextResponse.json(subscription);
+        // === CREATE BOT(S) FOR THE USER ===
+        // Determine which bots to create based on plan type
+        let botNamesToCreate: string[] = [];
+
+        if (plan.category === 'Bundles') {
+            // Bundle: Create multiple bots
+            if (plan.includedBots && plan.includedBots.length > 0) {
+                botNamesToCreate = plan.includedBots;
+            } else {
+                // Fallback for bundles without includedBots configured
+                const tier = plan.tier.toLowerCase();
+                if (tier.includes('starter')) {
+                    botNamesToCreate = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
+                } else if (tier.includes('pro')) {
+                    botNamesToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
+                } else if (tier.includes('expert')) {
+                    botNamesToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
+                }
+            }
+        } else {
+            // Single plan: Create one bot with the plan name
+            botNamesToCreate = [plan.name];
+        }
+
+        // Create bot records
+        for (const botName of botNamesToCreate) {
+            await prisma.bot.create({
+                data: {
+                    userId,
+                    name: botName,
+                    status: 'WAITING_FOR_SETUP',
+                    apiKey: '',
+                    secretKey: ''
+                }
+            });
+        }
+
+        return NextResponse.json({
+            subscription,
+            botsCreated: botNamesToCreate.length,
+            botNames: botNamesToCreate
+        });
     } catch (error: any) {
         console.error("Error creating manual subscription:", error);
         return new NextResponse(`Internal Error: ${error.message}`, { status: 500 });

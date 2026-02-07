@@ -33,13 +33,16 @@ function CreateKeyContent() {
     const [botId, setBotId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    // Verify payment on page load
+    // Verify payment and fetch bots in PARALLEL for faster loading
     useEffect(() => {
-        if (sessionId && !verified) {
-            verifyPayment();
-        }
-        // Fetch waiting bots regardless of session verify to support direct entry
-        fetchWaitingBots();
+        const init = async () => {
+            // Run both calls simultaneously instead of sequentially
+            await Promise.all([
+                fetchWaitingBots(),
+                sessionId && !verified ? verifyPayment() : Promise.resolve()
+            ]);
+        };
+        init();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId]);
 
@@ -72,8 +75,7 @@ function CreateKeyContent() {
                 const data = await res.json();
                 console.log('✅ Payment verified', data);
                 setVerified(true);
-                // Refresh waiting bots after verification (in case they were just created)
-                fetchWaitingBots();
+                // No need to fetchWaitingBots here - it's already called in parallel
             } else {
                 console.error('Failed to verify payment');
             }

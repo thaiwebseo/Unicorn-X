@@ -11,35 +11,35 @@ export async function GET() {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
+        // OPTIMIZED: Single query with includes instead of 3 separate queries
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email }
+            where: { email: session.user.email },
+            include: {
+                bots: {
+                    orderBy: { createdAt: 'desc' }
+                },
+                subscriptions: {
+                    where: {
+                        status: {
+                            in: ['ACTIVE', 'CANCELLED']
+                        }
+                    },
+                    include: {
+                        plan: true
+                    },
+                    orderBy: {
+                        endDate: 'desc'
+                    }
+                }
+            }
         });
 
         if (!user) {
             return new NextResponse('User not found', { status: 404 });
         }
 
-        // Fetch bots
-        const bots = await prisma.bot.findMany({
-            where: { userId: user.id },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        // Fetch active and cancelled subscriptions to map expiration dates
-        const subscriptions = await prisma.subscription.findMany({
-            where: {
-                userId: user.id,
-                status: {
-                    in: ['ACTIVE', 'CANCELLED']
-                }
-            },
-            include: {
-                plan: true
-            },
-            orderBy: {
-                endDate: 'desc'
-            }
-        });
+        const bots = user.bots;
+        const subscriptions = user.subscriptions;
 
         // Match bots to subscriptions (1-to-1 logic)
         const remainingSubs = [...subscriptions];
