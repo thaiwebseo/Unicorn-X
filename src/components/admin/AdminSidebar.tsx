@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package, Book } from 'lucide-react';
+import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package, Book, Layers } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -15,6 +15,7 @@ export default function AdminSidebar() {
         { href: '/x-control/subscriptions', label: 'Subscriptions', icon: CreditCard },
         { href: '/x-control/packages', label: 'Packages', icon: Package },
         { href: '/x-control/guides', label: 'Guides', icon: Book },
+        { href: '/x-control/content', label: 'Site Content', icon: Layers },
         // { href: '/x-control/settings', label: 'Settings', icon: Settings },
     ];
 
@@ -34,7 +35,9 @@ export default function AdminSidebar() {
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = pathname === item.href;
+                    const isActive = item.href === '/x-control'
+                        ? pathname === '/x-control'
+                        : pathname.startsWith(item.href);
                     return (
                         <Link
                             key={item.href}

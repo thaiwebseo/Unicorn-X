@@ -133,3 +133,45 @@ model Guide {
 
   @@map("guides")
 }
+
+model PricingCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g. 'Smart Timer DCA'
+  description String?  // Description shown in Pricing tabs
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("pricing_categories")
+}
+
+model BotContent {
+  id              String   @id @default(uuid())
+  slug            String   @unique // e.g. 'bollinger-dca'
+  name            String   // Internal name
+  
+  // Hero Section
+  heroTitle       String?
+  heroDescription String?
+  heroImage       String?
+
+  // CTA Buttons
+  ctaText         String?  // e.g. 'Start Free Trial'
+  ctaLink         String?  // e.g. '/register'
+
+  // Content Sections (JSON for flexibility)
+  whatIs          Json?    // { title, description }
+  howItWorks      Json?    // Array of { title, description }
+  features        Json?    // Array of { title, description }
+  whoIsFor        Json?    // Array of { title, description }
+  comparison      Json?    // Comparison table data
+  realLifeExamples Json?   // Array of cases
+
+  // SEO
+  seoTitle        String?
+  seoDescription  String?
+  
+  updatedAt       DateTime @updatedAt
+
+  @@map("bot_contents")
+}
