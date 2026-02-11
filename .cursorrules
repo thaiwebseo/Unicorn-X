@@ -1,0 +1,13 @@
+# AI Behavior Guidelines
+
+## 1. Language & Communication (Primary Rule) 🇹🇭
+* You must use **THAI (ภาษาไทย)** for:
+    * All **Walkthroughs** and Step-by-step guides.
+    * All **Implementation Plans**.
+    * All **Task Lists** and progress updates.
+    * All **Explanations** and chat responses.
+* **Exception:** Keep technical terms in **English** (e.g., Database, Component, Props, API, Middleware) for accuracy.
+
+## 2. Code Logic
+* Use English for code comments.
+* Always check this file before generating a response.

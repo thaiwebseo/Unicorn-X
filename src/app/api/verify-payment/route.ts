@@ -118,11 +118,13 @@ export async function POST(req: Request) {
             console.log(`✅ Auto-created Plan: ${plan.name}`);
         }
 
-        // CHECK FOR RENEWAL: Find existing subscription for this user and plan
+        // CHECK FOR RENEWAL: Find existing subscription for this user and SAME CATEGORY (allows switching Monthly <-> Yearly)
         const existingSubscriptionForPlan = await prisma.subscription.findFirst({
             where: {
                 userId: user.id,
-                planId: plan.id
+                plan: {
+                    category: plan.category
+                }
             },
             orderBy: { endDate: 'desc' }
         });
@@ -148,6 +150,7 @@ export async function POST(req: Request) {
                 where: { id: existingSubscriptionForPlan.id },
                 data: {
                     status: 'ACTIVE',
+                    planId: plan.id, // Update plan ID (e.g. switching from Monthly to Yearly)
                     isTrial: false, // Convert to paid if was trial
                     endDate: newEndDate,
                     stripeSessionId: sessionId // Update to track this most recent payment
@@ -157,13 +160,16 @@ export async function POST(req: Request) {
             // Create/Renew Bots for the user (Support Bundles)
             // Hardcoded fallback for bundles if DB is missing includedBots
             let botsToCreate = (plan as any).includedBots || [];
-            if (botsToCreate.length === 0 && plan.category === 'Bundles') {
+            // Robust Bundle Detection: Check category or if name contains 'bundle'
+            const isBundle = plan.category === 'Bundles' || plan.name.toLowerCase().includes('bundle') || plan.category.toLowerCase().includes('bundle');
+
+            if (botsToCreate.length === 0 && isBundle) {
                 const tier = plan.tier.toLowerCase();
-                if (tier.includes('starter')) {
+                if (tier.includes('starter') || plan.name.toLowerCase().includes('starter')) {
                     botsToCreate = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
-                } else if (tier.includes('pro')) {
+                } else if (tier.includes('pro') || plan.name.toLowerCase().includes('pro')) {
                     botsToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
-                } else if (tier.includes('expert')) {
+                } else if (tier.includes('expert') || plan.name.toLowerCase().includes('expert')) {
                     botsToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
                 }
             }
@@ -171,7 +177,7 @@ export async function POST(req: Request) {
 
             console.log(`📦 Renewal Processing: ${botsToCreate.length} bots for bundle/plan ${plan.name}`);
 
-            let lastProcessedBot = null;
+            const createdBotIds: string[] = [];
             for (const botName of botsToCreate) {
                 // 1. Try to find existing trial bot to convert
                 const trialBotName = `${botName} (Trial)`;
@@ -184,12 +190,13 @@ export async function POST(req: Request) {
 
                 if (existingTrialBot) {
                     // Convert trial bot to regular bot
-                    lastProcessedBot = await prisma.bot.update({
+                    const updatedBot = await prisma.bot.update({
                         where: { id: existingTrialBot.id },
                         data: {
                             name: botName // Remove (Trial) suffix
                         }
                     });
+                    createdBotIds.push(updatedBot.id);
                     console.log(`🔄 Converted trial bot '${trialBotName}' to paid bot '${botName}'`);
                 } else {
                     // 2. Or find existing regular bot
@@ -202,7 +209,7 @@ export async function POST(req: Request) {
 
                     if (!existingBot) {
                         // 3. Create new bot if doesn't exist
-                        lastProcessedBot = await prisma.bot.create({
+                        const newBot = await prisma.bot.create({
                             data: {
                                 userId: user.id,
                                 name: botName,
@@ -211,13 +218,14 @@ export async function POST(req: Request) {
                                 status: BotStatus.WAITING_FOR_SETUP
                             }
                         });
+                        createdBotIds.push(newBot.id);
                         console.log(`🤖 Created new bot '${botName}' during renewal`);
                     } else {
-                        lastProcessedBot = existingBot;
+                        createdBotIds.push(existingBot.id);
                     }
                 }
             }
-            bot = lastProcessedBot;
+            bot = createdBotIds;
 
         } else {
             // --- NEW SUBSCRIPTION LOGIC ---
@@ -260,36 +268,112 @@ export async function POST(req: Request) {
             // Create Bots for the user (Support Bundles)
             // Hardcoded fallback for bundles if DB is missing includedBots
             let botsToCreate = (plan as any).includedBots || [];
-            if (botsToCreate.length === 0 && plan.category === 'Bundles') {
+            // Robust Bundle Detection
+            const isBundle = plan.category === 'Bundles' || plan.name.toLowerCase().includes('bundle') || plan.category.toLowerCase().includes('bundle');
+
+            if (botsToCreate.length === 0 && isBundle) {
                 const tier = plan.tier.toLowerCase();
-                if (tier.includes('starter')) {
+                // Check tier or plan name for bundle type
+                if (tier.includes('starter') || plan.name.toLowerCase().includes('starter')) {
                     botsToCreate = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
-                } else if (tier.includes('pro')) {
+                } else if (tier.includes('pro') || plan.name.toLowerCase().includes('pro')) {
                     botsToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
-                } else if (tier.includes('expert')) {
+                } else if (tier.includes('expert') || plan.name.toLowerCase().includes('expert')) {
                     botsToCreate = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
                 }
             }
             if (botsToCreate.length === 0) botsToCreate = [planName || 'Trading Bot'];
 
+            // --- OPTION 1: Cancel Overlapping Subscriptions ---
+            // If buying a Bundle, check if user has existing active subscriptions for any of these bots
+            if (isBundle) {
+                const activeSubscriptions = await prisma.subscription.findMany({
+                    where: {
+                        userId: user.id,
+                        status: 'ACTIVE',
+                        id: { not: subscription.id }, // Exclude the new subscription we just created
+                        plan: {
+                            category: { not: 'Bundles' } // Only look for individual bot plans (or different bundles)
+                        }
+                    },
+                    include: { plan: true }
+                });
+
+                for (const sub of activeSubscriptions) {
+                    // Check if this subscription's plan includes any of the new bots
+                    // Note: We check if plan name or category matches any of the new botsToCreate
+                    const subPlanName = sub.plan.name;
+                    const subCategory = sub.plan.category;
+
+                    // Simple check: Is the plan name or category in our new list?
+                    // E.g. Old Plan: "Smart Timer DCA", New Bundle has "Smart Timer DCA - Starter"
+                    const isOverlapping = botsToCreate.some((newBotName: string) =>
+                        newBotName.includes(subCategory) || newBotName.includes(subPlanName)
+                    );
+
+                    if (isOverlapping) {
+                        console.log(`⚠️ Canceling overlapping subscription ${sub.id} (${sub.plan.name}) due to Bundle purchase`);
+                        await prisma.subscription.update({
+                            where: { id: sub.id },
+                            data: {
+                                status: 'CANCELLED',
+                                endDate: new Date() // End immediately
+                            }
+                        });
+                    }
+                }
+            }
+
             console.log(`📦 New Subscription Processing: ${botsToCreate.length} bots for bundle ${planName}`);
 
-            let lastProcessedBot = null;
+            const createdBotIds: string[] = [];
             for (const botName of botsToCreate) {
                 const finalBotName = isTrial ? `${botName} (Trial)` : botName;
-                const newBot = await prisma.bot.create({
-                    data: {
-                        userId: user.id,
-                        name: finalBotName,
-                        apiKey: '',
-                        secretKey: '',
-                        status: BotStatus.WAITING_FOR_SETUP
+
+                // 1. Try to find existing trial bot to convert (If buying paid version)
+                let existingTrialBot = null;
+                if (!isTrial) {
+                    const trialName = `${botName} (Trial)`;
+                    existingTrialBot = await prisma.bot.findFirst({
+                        where: { userId: user.id, name: trialName }
+                    });
+                }
+
+                if (existingTrialBot) {
+                    // Convert trial bot to regular bot
+                    console.log(`🔄 Converting trial bot '${existingTrialBot.name}' to paid bot '${finalBotName}'`);
+                    await prisma.bot.update({
+                        where: { id: existingTrialBot.id },
+                        data: {
+                            name: finalBotName // Remove (Trial) suffix
+                        }
+                    });
+                    createdBotIds.push(existingTrialBot.id);
+                } else {
+                    // 2. Check if bot with exact name already exists (Duplicate Prevention)
+                    const existingBot = await prisma.bot.findFirst({
+                        where: { userId: user.id, name: finalBotName }
+                    });
+
+                    if (existingBot) {
+                        console.log(`♻️  Reusing existing bot '${finalBotName}' for user ${user.id}`);
+                        createdBotIds.push(existingBot.id);
+                    } else {
+                        const newBot = await prisma.bot.create({
+                            data: {
+                                userId: user.id,
+                                name: finalBotName,
+                                apiKey: '',
+                                secretKey: '',
+                                status: BotStatus.WAITING_FOR_SETUP
+                            }
+                        });
+                        console.log(`🤖 Provisioned bot '${finalBotName}' for user ${user.id}`);
+                        createdBotIds.push(newBot.id);
                     }
-                });
-                console.log(`🤖 Provisioned bot '${finalBotName}' for user ${user.id}`);
-                lastProcessedBot = newBot;
+                }
             }
-            bot = lastProcessedBot;
+            bot = createdBotIds;
         }
 
         // Create Order record (Always create a record of payment)
@@ -309,7 +393,7 @@ export async function POST(req: Request) {
         return NextResponse.json({
             message: 'Payment processed successfully',
             subscriptionId: subscription.id,
-            botId: bot.id
+            botIds: Array.isArray(bot) ? bot : [bot.id]
         });
 
     } catch (error: any) {

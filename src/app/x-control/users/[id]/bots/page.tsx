@@ -20,6 +20,8 @@ interface Bot {
     updatedAt: string;
     startDate: string | null;
     endDate: string | null;
+    sourcePlan?: string;
+    isBundle?: boolean;
 }
 
 export default function UserBotList() {
@@ -146,7 +148,7 @@ export default function UserBotList() {
         <div className="space-y-6">
             <div className="flex items-center gap-4">
                 <Link
-                    href="/admin/users"
+                    href="/x-control/users"
                     className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
                 >
                     <ArrowLeft size={20} />
@@ -191,7 +193,7 @@ export default function UserBotList() {
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
-                            <th className="p-4 text-sm font-bold text-slate-600">Bot Name</th>
+                            <th className="p-4 text-sm font-bold text-slate-600">Bot Name / Plan</th>
                             <th className="p-4 text-sm font-bold text-slate-600">Status</th>
                             <th className="p-4 text-sm font-bold text-slate-600">Start Date</th>
                             <th className="p-4 text-sm font-bold text-slate-600">Expire Date</th>
@@ -207,7 +209,21 @@ export default function UserBotList() {
                         ) : (
                             filteredBots.map(bot => (
                                 <tr key={bot.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 font-medium text-cyan-600">{bot.name}</td>
+                                    <td className="p-4">
+                                        <div className="font-medium text-cyan-600">{bot.name}</div>
+                                        {bot.sourcePlan && (
+                                            <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                                                {bot.isBundle && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-[10px] tracking-wide">
+                                                        BUNDLE
+                                                    </span>
+                                                )}
+                                                <span className={bot.isBundle ? 'text-purple-600 font-medium' : 'text-slate-400'}>
+                                                    {bot.sourcePlan}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="p-4">{getStatusBadge(bot.status)}</td>
                                     <td className="p-4 text-sm text-slate-600" suppressHydrationWarning>
                                         {bot.startDate ? new Date(bot.startDate).toLocaleDateString('en-GB') : <span className="text-slate-400 italic">N/A</span>}

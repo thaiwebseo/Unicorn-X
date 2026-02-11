@@ -118,3 +118,18 @@ model Order {
 
   @@map("orders")
 }
+
+model Guide {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique  // สำหรับ URL เช่น /guides/how-to-create-api-key
+  content     String   @db.Text // เนื้อหา (Markdown หรือ HTML)
+  category    String   // หมวดหมู่: 'getting-started', 'exchange-setup', 'bot-guide', 'faq'
+  botNames    String[] @default([]) // บอทที่แสดงคู่มือนี้ เช่น ['Smart Timer DCA', 'MVRV DCA']
+  isPublished Boolean  @default(false)
+  sortOrder   Int      @default(0) // ลำดับการแสดง
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("guides")
+}

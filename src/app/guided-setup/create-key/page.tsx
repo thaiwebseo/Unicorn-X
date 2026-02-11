@@ -33,19 +33,66 @@ function CreateKeyContent() {
     const [botId, setBotId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
-    // Verify payment and fetch bots in PARALLEL for faster loading
+    // Optimized loading: Check localStorage first to skip redundant verifyPayment
     useEffect(() => {
         const init = async () => {
-            // Run both calls simultaneously instead of sequentially
-            await Promise.all([
-                fetchWaitingBots(),
-                sessionId && !verified ? verifyPayment() : Promise.resolve()
-            ]);
+            if (sessionId) {
+                // Check if this session was already verified (cached in localStorage)
+                const sessionCache = JSON.parse(localStorage.getItem(`session_${sessionId}`) || 'null');
+
+                if (sessionCache?.verified && sessionCache?.botIds) {
+                    // Session already verified before, skip verifyPayment and fetch bots directly
+                    console.log('✅ Session already verified (cached), fetching bots directly');
+                    setVerified(true);
+                    await fetchBotsById(sessionCache.botIds);
+                } else {
+                    // New session - need to verify payment first
+                    setVerifying(true);
+                    const botIds = await verifyPayment();
+                    if (botIds && botIds.length > 0) {
+                        await fetchBotsById(botIds);
+                    } else {
+                        // Fallback to fetch all waiting bots if no botIds returned
+                        await fetchWaitingBots();
+                    }
+                }
+            } else {
+                // No session ID - just fetch all waiting bots (returning user without session)
+                await fetchWaitingBots();
+            }
         };
         init();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId]);
 
+    // Fetch specific bots by IDs (for current payment session)
+    const fetchBotsById = async (botIds: string[]) => {
+        try {
+            const res = await fetch('/api/user/bots');
+            if (res.ok) {
+                const allBots = await res.json();
+                // Filter only bots matching the IDs from current payment
+                // Filter only bots matching the IDs from current payment
+                const currentSessionBots = allBots.filter((b: any) => botIds.includes(b.id));
+                setWaitingBots(currentSessionBots);
+
+                // Smart Selection: Default select ONLY bots that are waiting for setup
+                // (Don't auto-select bots that are already running/ready, unless they are the only ones)
+                const pendingBots = currentSessionBots.filter((b: any) => b.status === 'WAITING_FOR_SETUP' || b.status === 'SETTING_UP');
+
+                if (pendingBots.length > 0) {
+                    setSelectedBotIds(pendingBots.map((b: any) => b.id));
+                } else {
+                    // Fallback: If all are ready, select none (let user choose if they want to update)
+                    setSelectedBotIds([]);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching bots:', error);
+        }
+    };
+
+    // Fetch all waiting bots (fallback for returning users)
     const fetchWaitingBots = async () => {
         try {
             const res = await fetch('/api/user/bots');
@@ -62,8 +109,7 @@ function CreateKeyContent() {
         }
     };
 
-    const verifyPayment = async () => {
-        setVerifying(true);
+    const verifyPayment = async (): Promise<string[] | null> => {
         try {
             const res = await fetch('/api/verify-payment', {
                 method: 'POST',
@@ -75,12 +121,22 @@ function CreateKeyContent() {
                 const data = await res.json();
                 console.log('✅ Payment verified', data);
                 setVerified(true);
-                // No need to fetchWaitingBots here - it's already called in parallel
+
+                // Cache this session with its botIds
+                const sessionData = {
+                    verified: true,
+                    botIds: data.botIds || []
+                };
+                localStorage.setItem(`session_${sessionId}`, JSON.stringify(sessionData));
+
+                return data.botIds || null;
             } else {
                 console.error('Failed to verify payment');
+                return null;
             }
         } catch (error) {
             console.error('Error verifying payment:', error);
+            return null;
         } finally {
             setVerifying(false);
         }
@@ -115,9 +171,16 @@ function CreateKeyContent() {
 
             // Loop through selected bots
             for (const targetBotId of selectedBotIds) {
-                // Generate webhook URL with new format
-                const randomToken = generateRandomString(15);
-                const generatedWebhook = `https://u2qkzg3.execute-api.ap-northeast-1.amazonaws.com/${targetBotId}/webhook/${randomToken}`;
+                // Find existing bot to check if it already has a webhook
+                const existingBot = waitingBots.find(b => b.id === targetBotId);
+
+                // Only generate new webhook if bot doesn't have one yet
+                let generatedWebhook = existingBot?.webhookUrl;
+                if (!generatedWebhook) {
+                    // Generate webhook URL with new format (10 random characters only)
+                    const randomToken = generateRandomString(10);
+                    generatedWebhook = `https://u2qkzg3.execute-api.ap-northeast-1.amazonaws.com/webhook/${randomToken}`;
+                }
 
                 // Save API keys to bot
                 console.log('🔄 Updating bot:', targetBotId);
@@ -175,7 +238,9 @@ function CreateKeyContent() {
     };
 
     const handleNextStep = () => {
-        router.push('/dashboard');
+        // Navigate to Step 3 (Setup Bot) with the bot IDs that were just configured
+        const botIdsParam = selectedBotIds.join(',');
+        router.push(`/guided-setup/setup-bot?botIds=${botIdsParam}`);
     };
 
     // Determine if we are in "Bulk/Selective" mode
@@ -223,28 +288,46 @@ function CreateKeyContent() {
                             </button>
                         </div>
                         <div className="space-y-2">
-                            {waitingBots.map(bot => (
-                                <div
-                                    key={bot.id}
-                                    onClick={() => toggleBotSelection(bot.id)}
-                                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedBotIds.includes(bot.id)
-                                        ? 'bg-white border-cyan-500 shadow-sm'
-                                        : 'bg-slate-100/50 border-transparent hover:bg-slate-100 border-slate-200'
-                                        }`}
-                                >
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedBotIds.includes(bot.id) ? 'bg-cyan-500 border-cyan-500' : 'bg-white border-slate-300'
-                                        }`}>
-                                        {selectedBotIds.includes(bot.id) && <Check size={14} className="text-white" />}
+                            {waitingBots.map(bot => {
+                                const isReady = bot.status === 'READY' || bot.status === 'RUNNING';
+                                return (
+                                    <div
+                                        key={bot.id}
+                                        onClick={() => toggleBotSelection(bot.id)}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedBotIds.includes(bot.id)
+                                            ? 'bg-white border-cyan-500 shadow-sm'
+                                            : 'bg-slate-50 border-transparent hover:bg-slate-100 border-slate-200'
+                                            }`}
+                                    >
+                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedBotIds.includes(bot.id) ? 'bg-cyan-500 border-cyan-500' : 'bg-white border-slate-300'
+                                            }`}>
+                                            {selectedBotIds.includes(bot.id) && <Check size={14} className="text-white" />}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-bold text-slate-800 text-sm">{bot.name}</div>
+                                                {isReady && (
+                                                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded">
+                                                        Active
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                                                Status:
+                                                <span className={isReady ? 'text-emerald-600 font-medium' : 'text-amber-600 font-medium'}>
+                                                    {bot.status.replace(/_/g, ' ')}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <div className="font-bold text-slate-800 text-sm">{bot.name}</div>
-                                        <div className="text-[10px] text-slate-400 font-mono">Status: {bot.status}</div>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         <p className="text-[11px] text-slate-400 leading-tight">
-                            Select which bots you want to use with the API Key below. Each bot will get its own unique Webhook automatically.
+                            Select which bots you want to use with the new API Key below.
+                            <span className="block mt-1 text-slate-500">
+                                Bots marked as <span className="text-emerald-600 font-bold">Active</span> are already running, but you can update their keys if needed.
+                            </span>
                         </p>
                     </div>
                 )}
@@ -404,10 +487,10 @@ function CreateKeyContent() {
                             )}
 
                             <button
-                                onClick={() => setShowSuccessModal(false)}
+                                onClick={handleNextStep}
                                 className="w-full py-3.5 bg-white border border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50 transition-colors"
                             >
-                                Close this modal
+                                Skip to Next Step
                             </button>
                         </div>
 

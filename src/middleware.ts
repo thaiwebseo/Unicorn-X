@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export default withAuth(
     function middleware(req) {
-        if (req.nextUrl.pathname.startsWith("/admin") && req.nextauth.token?.role !== "ADMIN") {
+        if (req.nextUrl.pathname.startsWith("/x-control") && req.nextauth.token?.role !== "ADMIN") {
             return NextResponse.redirect(new URL("/dashboard", req.url));
         }
     },
@@ -15,5 +15,5 @@ export default withAuth(
 );
 
 export const config = {
-    matcher: ["/admin/:path*", "/dashboard/:path*"],
+    matcher: ["/x-control/:path*", "/dashboard/:path*"],
 };

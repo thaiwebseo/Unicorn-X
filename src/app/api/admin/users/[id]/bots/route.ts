@@ -22,17 +22,68 @@ export async function GET(
             orderBy: { updatedAt: 'desc' }
         });
 
-        // Add subscription dates to each bot (similar to main bots API)
-        const activeSub = await prisma.subscription.findFirst({
-            where: { userId, status: 'ACTIVE' },
+        // Fetch all subscriptions for this user
+        const subscriptions = await prisma.subscription.findMany({
+            where: {
+                userId,
+                status: { in: ['ACTIVE', 'CANCELLED'] }
+            },
+            include: { plan: true },
             orderBy: { endDate: 'desc' }
         });
 
-        const botsWithDates = bots.map(bot => ({
-            ...bot,
-            startDate: activeSub?.startDate || null,
-            endDate: activeSub?.endDate || null,
-        }));
+        // Match bots to their correct subscription
+        const botsWithDates = bots.map(bot => {
+            // Find best matching subscription
+            let bestSub: any = null;
+            let minTimeDiff = Infinity;
+
+            subscriptions.forEach((sub: any) => {
+                let targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
+                    ? [...sub.plan.includedBots]
+                    : [];
+
+                // Fallback for Bundles
+                if (targets.length === 0 && sub.plan.category === 'Bundles') {
+                    const tier = sub.plan.tier.toLowerCase();
+                    if (tier.includes('starter')) {
+                        targets = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
+                    } else if (tier.includes('pro')) {
+                        targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
+                    } else if (tier.includes('expert')) {
+                        targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
+                    }
+                }
+                if (targets.length === 0) targets = [sub.plan.name];
+
+                // Normalize bot name
+                const normalizedBotName = bot.name.replace(/\s\(Trial\)$/, '');
+
+                if (targets.includes(normalizedBotName)) {
+                    if (!bestSub) bestSub = sub;
+                }
+            });
+
+            return {
+                ...bot,
+                startDate: bestSub?.startDate || null,
+                endDate: bestSub?.endDate || null,
+                sourcePlan: bestSub?.plan?.name || 'Unknown',
+                isBundle: bestSub?.plan?.category === 'Bundles' || false
+            };
+        });
+
+        // Sort Logic
+        botsWithDates.sort((a, b) => {
+            // Primary: Source Plan (Bundle)
+            const planA = a.sourcePlan || '';
+            const planB = b.sourcePlan || '';
+            const planComparison = planA.localeCompare(planB);
+            if (planComparison !== 0) return planComparison;
+
+            // Secondary: Bot Name
+            return a.name.localeCompare(b.name);
+        });
 
         return NextResponse.json(botsWithDates);
     } catch (error: any) {

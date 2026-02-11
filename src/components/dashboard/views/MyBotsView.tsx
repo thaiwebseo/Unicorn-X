@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Play, Pause, Settings, ChevronDown, ChevronUp, Copy, Check, Info, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { Play, Pause, Settings, ChevronDown, ChevronUp, Copy, Check, Info, Loader2, Lock, Eye, EyeOff, Book } from 'lucide-react';
+import Link from 'next/link';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import PasswordVerificationModal from '@/components/PasswordVerificationModal';
 
@@ -38,6 +39,7 @@ export default function MyBotsView() {
 
     const [subscriptions, setSubscriptions] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [botGuides, setBotGuides] = useState<{ [category: string]: { slug: string, title: string }[] }>({});
 
     const showToast = (message: string) => {
         setError(message);
@@ -47,7 +49,7 @@ export default function MyBotsView() {
     useEffect(() => {
         const init = async () => {
             setLoading(true);
-            await Promise.all([fetchBots(true), fetchSubscriptions()]);
+            await Promise.all([fetchBots(true), fetchSubscriptions(), fetchBotGuides()]);
             setLoading(false);
         };
         init();
@@ -101,6 +103,23 @@ export default function MyBotsView() {
         } catch (error) {
             console.error('Error fetching subscriptions:', error);
         }
+    };
+
+    const fetchBotGuides = async () => {
+        try {
+            const res = await fetch('/api/guides/by-category');
+            if (res.ok) {
+                const data = await res.json();
+                setBotGuides(data);
+            }
+        } catch (error) {
+            console.error('Error fetching bot guides:', error);
+        }
+    };
+
+    // Get bot category from bot name (e.g., "Smart Timer DCA - Starter" -> "Smart Timer DCA")
+    const getBotCategory = (botName: string): string => {
+        return botName.replace(/ - (Starter|Pro|Expert)$/i, '').trim();
     };
 
     // Toggle Accordion
@@ -168,9 +187,20 @@ export default function MyBotsView() {
         if (pendingBotId) {
             const config = botConfigs[pendingBotId];
 
-            // Generate Random Webhook URL
-            const randomString = Math.random().toString(36).substring(2, 12).toUpperCase();
-            const newWebhook = `https://u2qkzg3.execute-api.ap-northeast-1.amazonaws.com/${pendingBotId}/webhook/${randomString}`;
+            // Find the existing bot to check if it already has a webhook
+            const existingBot = bots.find(b => b.id === pendingBotId);
+
+            // Only generate new webhook if bot doesn't have one yet
+            let webhookUrl = existingBot?.webhookUrl;
+            if (!webhookUrl) {
+                // Generate Random Webhook URL (10 random characters - mixed case + numbers)
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                let randomString = '';
+                for (let i = 0; i < 10; i++) {
+                    randomString += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                webhookUrl = `https://u2qkzg3.execute-api.ap-northeast-1.amazonaws.com/webhook/${randomString}`;
+            }
 
             try {
                 const res = await fetch('/api/user/bots', {
@@ -181,7 +211,7 @@ export default function MyBotsView() {
                         apiKey: config.apiKey,
                         secretKey: config.secretKey,
                         tradingViewEmail: config.email,
-                        webhookUrl: newWebhook,
+                        webhookUrl: webhookUrl,
                         status: 'SETTING_UP'
                     })
                 });
@@ -425,15 +455,30 @@ export default function MyBotsView() {
                             {getStatusLabel(bot.status)}
                         </span>
 
-                        {/* Config Button */}
-                        <button
-                            onClick={() => toggleConfig(bot.id)}
-                            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-colors text-sm"
-                        >
-                            <Settings size={16} />
-                            Config
-                            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
+                        {/* Buttons Row */}
+                        <div className="flex items-center gap-2">
+                            {/* Bot Guide Button */}
+                            {botGuides[getBotCategory(bot.name)]?.length > 0 && (
+                                <Link
+                                    href={`/guides/${botGuides[getBotCategory(bot.name)][0].slug}`}
+                                    target="_blank"
+                                    className="flex items-center gap-2 px-4 py-2 border border-cyan-200 text-cyan-600 font-medium rounded-xl hover:bg-cyan-50 transition-colors text-sm"
+                                >
+                                    <Book size={16} />
+                                    Bot Guide
+                                </Link>
+                            )}
+
+                            {/* Config Button */}
+                            <button
+                                onClick={() => toggleConfig(bot.id)}
+                                className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 font-medium rounded-xl hover:bg-slate-50 transition-colors text-sm"
+                            >
+                                <Settings size={16} />
+                                Config
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

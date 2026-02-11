@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package } from 'lucide-react';
+import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package, Book } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -9,12 +9,13 @@ export default function AdminSidebar() {
     const pathname = usePathname();
 
     const menuItems = [
-        { href: '/admin', label: 'Overview', icon: LayoutDashboard },
-        { href: '/admin/users', label: 'User Management', icon: Users },
-        { href: '/admin/bots', label: 'Bot Management', icon: Bot },
-        { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
-        { href: '/admin/packages', label: 'Packages', icon: Package },
-        // { href: '/admin/settings', label: 'Settings', icon: Settings },
+        { href: '/x-control', label: 'Overview', icon: LayoutDashboard },
+        { href: '/x-control/users', label: 'User Management', icon: Users },
+        { href: '/x-control/bots', label: 'Bot Management', icon: Bot },
+        { href: '/x-control/subscriptions', label: 'Subscriptions', icon: CreditCard },
+        { href: '/x-control/packages', label: 'Packages', icon: Package },
+        { href: '/x-control/guides', label: 'Guides', icon: Book },
+        // { href: '/x-control/settings', label: 'Settings', icon: Settings },
     ];
 
     return (

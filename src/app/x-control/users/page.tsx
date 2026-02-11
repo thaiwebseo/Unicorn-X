@@ -272,7 +272,7 @@ export default function UsersManagement() {
                                                 View Details
                                             </button>
                                             <Link
-                                                href={`/admin/users/${user.id}/bots`}
+                                                href={`/x-control/users/${user.id}/bots`}
                                                 className="px-3 py-1.5 bg-cyan-50 text-cyan-700 rounded-lg text-xs font-bold hover:bg-cyan-100 transition-colors flex items-center gap-1.5"
                                             >
                                                 <Bot size={12} />
