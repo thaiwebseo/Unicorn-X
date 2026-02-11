@@ -58,26 +58,35 @@ const pricingData: Record<PricingCategory, PlanTier[]> = {
 
 const Pricing = () => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-    const [activeCategory, setActiveCategory] = useState<PricingCategory>('Smart Timer DCA');
+    const [activeCategory, setActiveCategory] = useState<string>('Smart Timer DCA');
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
     const [dbPlans, setDbPlans] = useState<any[]>([]);
+    const [dbCategories, setDbCategories] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchPlans = async () => {
+        const fetchData = async () => {
             try {
-                const res = await fetch('/api/plans');
-                if (res.ok) {
-                    const data = await res.json();
+                // Fetch Plans
+                const plansRes = await fetch('/api/plans');
+                if (plansRes.ok) {
+                    const data = await plansRes.json();
                     setDbPlans(data);
                 }
+
+                // Fetch Categories
+                const catsRes = await fetch('/api/pricing-categories');
+                if (catsRes.ok) {
+                    const data = await catsRes.json();
+                    setDbCategories(data);
+                }
             } catch (error) {
-                console.error('Error fetching plans:', error);
+                console.error('Error fetching pricing data:', error);
             }
         };
-        fetchPlans();
+        fetchData();
     }, []);
 
-    const handleSubscribe = (plan: typeof pricingData[PricingCategory][0], isTrial = false) => {
+    const handleSubscribe = (plan: PlanTier, isTrial = false) => {
         setLoadingPlan(plan.name);
 
         // Combine category with tier for full plan name (e.g., "Smart Timer DCA - Starter")
@@ -106,6 +115,13 @@ const Pricing = () => {
         window.location.href = `/checkout?${params.toString()}`;
     };
 
+    const currentCategoryData = dbCategories.find(c => c.name === activeCategory);
+    const displayDescription = currentCategoryData?.description || (categoryDescriptions[activeCategory as PricingCategory] || '');
+    const displayCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : categories;
+
+    // Safely get plan data for categories
+    const currentPricingData = pricingData[activeCategory as PricingCategory] || [];
+
     return (
         <section id="pricing" className="pt-12 pb-24 bg-slate-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -122,7 +138,7 @@ const Pricing = () => {
                 {/* Category Selector - Separate Pills */}
                 <div className="mt-10 flex justify-center">
                     <div className="inline-flex flex-wrap justify-center gap-2">
-                        {categories.map((cat) => (
+                        {displayCategories.map((cat) => (
                             <button
                                 key={cat}
                                 onClick={() => setActiveCategory(cat)}
@@ -141,7 +157,7 @@ const Pricing = () => {
                 <div className="mt-10 text-center">
                     <h3 className="text-xl font-bold italic text-cyan-600">{activeCategory} - Pricing & Features</h3>
                     <p className="text-slate-600 mt-2">
-                        {categoryDescriptions[activeCategory]}
+                        {displayDescription}
                     </p>
                     <div className="mt-3">
                         {activeCategory !== 'Bundles' && (
@@ -192,11 +208,11 @@ const Pricing = () => {
                 </div>
 
                 {/* Pricing Cards */}
-                <div className={`mt-12 grid grid-cols-1 gap-8 justify-items-center ${pricingData[activeCategory].length === 2
+                <div className={`mt-12 grid grid-cols-1 gap-8 justify-items-center ${currentPricingData.length === 2
                     ? 'lg:grid-cols-2 max-w-4xl mx-auto'
                     : 'lg:grid-cols-3'
                     }`}>
-                    {pricingData[activeCategory].map((plan) => (
+                    {currentPricingData.map((plan) => (
                         <div
                             key={plan.name}
                             className={`relative rounded-2xl p-8 flex flex-col bg-white w-full max-w-sm lg:max-w-none min-h-[420px] ${plan.highlight

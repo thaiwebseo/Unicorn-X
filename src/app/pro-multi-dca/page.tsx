@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
@@ -11,25 +12,25 @@ const steps = [
         number: 1,
         title: 'Buy in Multiple Stages',
         description: 'Place several safety orders, each with your own dip percentages and adjustable order sizes.',
-        className: 'lg:col-span-6'
+        className: 'lg:col-span-3'
     },
     {
         number: 2,
         title: 'Smarter Triggers',
         description: 'Link each buy to indicators like RSI, MACD, or MA Cross for precision timing. Every indicator can be fully customized with your preferred timeframes, thresholds, and conditions.',
-        className: 'lg:col-span-2'
+        className: 'lg:col-span-1'
     },
     {
         number: 3,
         title: 'Adaptive Order Sizing',
         description: 'Increase order size at deeper dips to maximize recovery potential, or scale down in high-risk market conditions.',
-        className: 'lg:col-span-2'
+        className: 'lg:col-span-1'
     },
     {
         number: 4,
         title: 'Profit & Risk Protection',
         description: 'Secure profits with smart trailing stops, limit downside with stop-loss, and lower your average entry price through smart safety orders.',
-        className: 'lg:col-span-2'
+        className: 'lg:col-span-1'
     }
 ];
 
@@ -85,6 +86,38 @@ const comparisonData = [
 ];
 
 export default function ProMultiDCAPage() {
+    const [content, setContent] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchContent = async () => {
+            try {
+                const res = await fetch('/api/content/bots/pro-multi-dca');
+                if (res.ok) {
+                    const data = await res.json();
+                    setContent(data);
+                }
+            } catch (error) {
+                console.error('Error fetching bot content:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchContent();
+    }, []);
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>;
+    }
+
+    const displayHeroTitle = content?.heroTitle || "Pro Multi-DCA";
+    const displayHeroDesc = content?.heroDescription || "Full-stack DCA engine with auto sizing & safety orders.";
+    const displayCtaText = content?.ctaText || "Start Free Trial";
+    const displayCtaLink = content?.ctaLink || "/register";
+
     return (
         <>
             <Navbar />
@@ -107,23 +140,23 @@ export default function ProMultiDCAPage() {
                                     UnicornX Bot
                                 </span>
                                 <h1 className="text-5xl lg:text-6xl font-extrabold text-[#00C2CC] leading-tight tracking-tight">
-                                    Pro Multi-DCA
+                                    {displayHeroTitle}
                                 </h1>
                                 <p className="text-xl text-slate-800 font-normal max-w-lg leading-snug">
-                                    Full-stack DCA engine with auto sizing & safety orders.
+                                    {displayHeroDesc}
                                 </p>
                                 <div className="pt-4">
                                     <Link
-                                        href="/register"
+                                        href={displayCtaLink}
                                         className="inline-block px-8 py-3 bg-[#00C2CC] text-white font-bold rounded-lg hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
                                     >
-                                        Start Free Trial
+                                        {displayCtaText}
                                     </Link>
                                 </div>
                             </div>
                             <div className="lg:w-7/12 relative flex justify-center lg:justify-end">
                                 <Image
-                                    src="/images/Pro Multi-DCA 1.png"
+                                    src={content?.heroImage || "/images/Pro Multi-DCA 1.png"}
                                     alt="Pro Multi-DCA Hero"
                                     width={800}
                                     height={600}
@@ -145,13 +178,15 @@ export default function ProMultiDCAPage() {
                     </section>
                 </div>
 
+
+
                 {/* How Does It Work? */}
                 <section className="py-20 px-4 max-w-7xl mx-auto">
                     <div className="text-center mb-12">
                         <h2 className="text-4xl font-extrabold text-[#0B0F19]">How Does It Work?</h2>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {steps.map((step) => (
                             <div
                                 key={step.number}
@@ -190,7 +225,7 @@ export default function ProMultiDCAPage() {
 
                     <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 relative z-10">
                         <div className="lg:w-1/2 space-y-8">
-                            <h2 className="text-4xl font-extrabold text-slate-900">
+                            <h2 className="text-4xl lg:text-5xl font-extrabold text-[#0B0F19] leading-tight">
                                 Why Choose<br />Pro Multi-DCA?
                             </h2>
                             <div className="space-y-6">
@@ -204,27 +239,14 @@ export default function ProMultiDCAPage() {
                                 ))}
                             </div>
                         </div>
-                        <div className="lg:w-1/2 relative h-[500px] w-full flex items-center justify-center lg:justify-end">
-                            {/* Chart Image (Back) */}
-                            <div className="absolute right-6 top-1/2 -translate-y-1/2 w-[90%] h-auto z-0">
-                                <Image
-                                    src="/images/Pro Multi-DCA 2.png"
-                                    alt="Pro Multi-DCA Chart"
-                                    width={800}
-                                    height={600}
-                                    className="w-full h-auto object-contain rounded-xl shadow-lg"
-                                />
-                            </div>
-                            {/* Overlay Image (Front) */}
-                            <div className="relative z-10 w-[75%] -translate-x-12 translate-y-12">
-                                <Image
-                                    src="/images/Pro Multi-DCA 3.png"
-                                    alt="Pro Multi-DCA Feature"
-                                    width={500}
-                                    height={500}
-                                    className="w-full h-auto object-contain drop-shadow-2xl rounded-lg border border-white/20"
-                                />
-                            </div>
+                        <div className="lg:w-1/2">
+                            <Image
+                                src="/images/Pro Multi-DCA.png"
+                                alt="Why Choose Pro Multi-DCA Chart"
+                                width={800}
+                                height={600}
+                                className="w-full h-auto rounded-lg shadow-xl"
+                            />
                         </div>
                     </div>
                 </section>
@@ -281,10 +303,10 @@ export default function ProMultiDCAPage() {
                                     </div>
                                     <div className="pt-4">
                                         <Link
-                                            href="/register"
+                                            href={displayCtaLink}
                                             className="inline-block w-full text-center px-12 py-4 bg-[#00C2CC] text-white font-bold rounded-xl hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
                                         >
-                                            Start Free Trial
+                                            {displayCtaText}
                                         </Link>
                                     </div>
                                 </div>
@@ -293,76 +315,72 @@ export default function ProMultiDCAPage() {
                     </div>
                 </section>
 
-                {/* Real-Life Example */}
-                <section className="bg-slate-50 pb-24 pt-0 px-4">
-                    <div className="max-w-4xl mx-auto text-center">
-                        <h2 className="text-4xl font-extrabold text-[#0B0F19] mb-8">Real-Life Example</h2>
-                        <p className="text-slate-600 text-lg leading-relaxed">
-                            Instead of buying gold every month on a fixed schedule, the bot waits for strong buy signals—such as an oversold RSI and a bullish MACD crossover. When these signals align, it executes a precise buy automatically. You can even set larger orders when the dip is deeper. This approach improves your average entry price and boosts profit potential, because you're investing at moments when the market is in your favor—not just by the calendar.
-                        </p>
-                    </div>
-                </section>
-
                 {/* Comparison Table */}
-                <section className="py-20 px-4 max-w-5xl mx-auto">
-                    <div className="text-center mb-12">
-                        <span className="inline-block px-4 py-1.5 bg-cyan-50 text-cyan-700 rounded-full text-xs font-bold uppercase tracking-wider mb-4">
-                            Comparison
-                        </span>
-                        <h2 className="text-3xl font-extrabold text-slate-900">
-                            Traditional DCA & Pro Multi-DCA
-                        </h2>
-                    </div>
-
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="grid grid-cols-12 bg-slate-50 py-6 px-6 border-b border-slate-200 font-bold text-slate-900">
-                            <div className="col-span-6 md:col-span-6">Feature</div>
-                            <div className="col-span-3 md:col-span-3 text-center text-slate-500">Traditional DCA</div>
-                            <div className="col-span-3 md:col-span-3 text-center text-[#00C2CC]">Pro Multi-DCA</div>
+                <section className="py-24 px-4 bg-slate-50/50">
+                    <div className="max-w-5xl mx-auto">
+                        <div className="text-center mb-16 space-y-4">
+                            <div className="inline-block px-4 py-1.5 bg-cyan-100/50 text-cyan-600 rounded-full text-sm font-bold border border-cyan-100 mb-2">
+                                Comparison
+                            </div>
+                            <h2 className="text-4xl lg:text-5xl font-black text-[#0B0F19]">Traditional DCA & Pro Multi-DCA</h2>
                         </div>
-                        <div className="divide-y divide-slate-100">
-                            {comparisonData.map((row, idx) => (
-                                <div key={idx} className="grid grid-cols-12 py-5 px-6 items-center hover:bg-slate-50 transition-colors">
-                                    <div className="col-span-6 md:col-span-6 text-sm font-bold text-slate-900">
-                                        {row.feature}
-                                    </div>
-                                    <div className="col-span-3 md:col-span-3 flex justify-center">
-                                        {row.traditional ? (
-                                            <div className="w-6 h-6 rounded-md bg-[#00C2CC] flex items-center justify-center">
-                                                <Check className="w-4 h-4 text-white stroke-[3]" />
-                                            </div>
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                                                <Check className="w-4 h-4 text-white" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="col-span-3 md:col-span-3 flex justify-center items-center gap-2">
-                                        {row.timer ? (
-                                            <>
-                                                <div className="w-6 h-6 flex-shrink-0 rounded-md bg-[#00C2CC] flex items-center justify-center">
-                                                    <Check className="w-4 h-4 text-white stroke-[3]" />
+
+                        <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-slate-100">
+                                        <th className="p-8 text-lg font-bold text-slate-400 w-1/3">Feature</th>
+                                        <th className="p-8 text-lg font-bold text-slate-800 text-center w-1/3 border-l border-slate-100">Traditional DCA</th>
+                                        <th className="p-8 text-lg font-bold text-cyan-500 text-center w-1/3 border-l border-slate-100">Pro Multi-DCA</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {comparisonData.map((row, idx) => (
+                                        <tr key={idx} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                            <td className="p-8 font-extrabold text-[#0B0F19] text-lg">
+                                                {row.feature}
+                                            </td>
+                                            <td className="p-8 text-center border-l border-slate-100">
+                                                <div className="flex items-center justify-center">
+                                                    {row.traditional ? (
+                                                        <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-sm">
+                                                            <Check className="w-5 h-5 text-white stroke-[3px]" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                                            <Check className="w-5 h-5 text-slate-300 stroke-[3px]" />
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {/* @ts-ignore */}
-                                                {row.note && (
-                                                    <span className="text-[10px] md:text-xs font-medium text-slate-500 text-left leading-tight hidden md:block max-w-[120px]">
-                                                        {/* @ts-ignore */}
-                                                        {row.note}
-                                                    </span>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                                                <Check className="w-4 h-4 text-white" />
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                                            </td>
+                                            <td className="p-8 text-center bg-cyan-50/5 border-l border-slate-100">
+                                                <div className="flex items-center gap-4 justify-center">
+                                                    {row.timer ? (
+                                                        <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                                            <Check className="w-5 h-5 text-white stroke-[3px]" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                                            <Check className="w-5 h-5 text-slate-300 stroke-[3px]" />
+                                                        </div>
+                                                    )}
+                                                    {row.note && (
+                                                        <span className="text-xs text-slate-600 font-bold text-left max-w-[150px] leading-tight">
+                                                            {row.note}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
-            </main >
+
+
+            </main>
             <Footer />
         </>
     );

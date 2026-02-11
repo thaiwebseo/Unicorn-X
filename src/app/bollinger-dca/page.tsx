@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
+
 import Footer from '@/components/Footer';
 import { Check, X } from 'lucide-react';
 
@@ -93,7 +95,41 @@ const comparisonData = [
     { feature: 'Runs fully inside TradingView', traditional: false, timer: true },
 ];
 
+
 export default function BollingerDCAPage() {
+    const [content, setContent] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchContent = async () => {
+            try {
+                const res = await fetch('/api/content/bots/bollinger-dca');
+                if (res.ok) {
+                    const data = await res.json();
+                    setContent(data);
+                }
+            } catch (error) {
+                console.error('Error fetching bot content:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchContent();
+    }, []);
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FB]">
+            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>;
+    }
+
+    // Default fallbacks if content not found or still using some hardcoded parts
+    const displayHeroTitle = content?.heroTitle || "Bollinger DCA";
+    const displayHeroDesc = content?.heroDescription || "Buy the dip with volatility-based entry logic.";
+    const displayCtaText = content?.ctaText || "Start Free Trial";
+    const displayCtaLink = content?.ctaLink || "/register";
+
     return (
         <>
             <Navbar />
@@ -116,23 +152,23 @@ export default function BollingerDCAPage() {
                                     UnicornX Bot
                                 </span>
                                 <h1 className="text-5xl lg:text-6xl font-extrabold text-[#00C2CC] leading-tight tracking-tight">
-                                    Bollinger DCA
+                                    {displayHeroTitle}
                                 </h1>
                                 <p className="text-xl text-slate-800 font-normal max-w-lg leading-snug">
-                                    Buy the dip with volatility-based entry logic.
+                                    {displayHeroDesc}
                                 </p>
                                 <div className="pt-4">
                                     <Link
-                                        href="/register"
+                                        href={displayCtaLink}
                                         className="inline-block px-8 py-3 bg-[#00C2CC] text-white font-bold rounded-lg hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
                                     >
-                                        Start Free Trial
+                                        {displayCtaText}
                                     </Link>
                                 </div>
                             </div>
                             <div className="lg:w-7/12 relative flex justify-center lg:justify-end">
                                 <Image
-                                    src="/images/Bollinger DCA 1.png"
+                                    src={content?.heroImage || "/images/Bollinger DCA 1.png"}
                                     alt="Bollinger DCA Hero"
                                     width={600}
                                     height={600}
@@ -142,6 +178,7 @@ export default function BollingerDCAPage() {
                             </div>
                         </div>
                     </section>
+
 
                     {/* What is Bollinger DCA? */}
                     <section className="py-20 px-4">
@@ -295,10 +332,10 @@ export default function BollingerDCAPage() {
                                     </div>
                                     <div className="pt-4">
                                         <Link
-                                            href="/register"
+                                            href={displayCtaLink}
                                             className="inline-block w-full text-center px-12 py-4 bg-[#00C2CC] text-white font-bold rounded-xl hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
                                         >
-                                            Start Free Trial
+                                            {displayCtaText}
                                         </Link>
                                     </div>
                                 </div>
