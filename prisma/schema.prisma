@@ -163,7 +163,10 @@ model BotContent {
   whatIs          Json?    // { title, description }
   howItWorks      Json?    // Array of { title, description }
   features        Json?    // Array of { title, description }
+  featuresImage   String?  // New: Image for Features section
   whoIsFor        Json?    // Array of { title, description }
+  whoIsForImage1  String?  // New: Primary image for Who Is For section
+  whoIsForImage2  String?  // New: Secondary image (layered) for Who Is For section
   comparison      Json?    // Comparison table data
   realLifeExamples Json?   // Array of cases
 

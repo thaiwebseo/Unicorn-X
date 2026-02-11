@@ -6,8 +6,13 @@ import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Check, X } from 'lucide-react';
+import { InlineEditProvider } from '@/components/inline-edit/InlineEditProvider';
+import { EditableText } from '@/components/inline-edit/EditableText';
+import { EditableImage } from '@/components/inline-edit/EditableImage';
+import { EditableLink } from '@/components/inline-edit/EditableLink';
+import { AdminToolbar } from '@/components/inline-edit/AdminToolbar';
 
-const steps = [
+const defaultSteps = [
     {
         number: 1,
         title: 'Choose Your Schedule',
@@ -45,7 +50,7 @@ const steps = [
 ];
 
 
-const features = [
+const defaultFeatures = [
     {
         title: 'Regular Schedule + Smart Adjustments',
         description: 'Stay consistent while optimizing your allocations based on real market conditions.'
@@ -72,7 +77,7 @@ const features = [
     }
 ];
 
-const whoIsFor = [
+const defaultWhoIsFor = [
     {
         title: 'Disciplined Investors',
         description: 'You want a schedule but also want smarter allocation.'
@@ -87,13 +92,19 @@ const whoIsFor = [
     }
 ];
 
-const comparisonData = [
+const defaultComparisonData = [
     { feature: 'Fixed schedule buys', traditional: true, timer: true },
     { feature: 'On-chain cycle awareness', traditional: false, timer: true },
     { feature: 'Adjusts buy size by valuation', traditional: false, timer: true },
     { feature: 'Skips/limits buys in overheated zones', traditional: false, timer: true },
     { feature: 'Optional profit-taking', traditional: false, timer: true },
     { feature: 'Runs fully inside TradingView', traditional: false, timer: true },
+];
+
+const defaultRealLifeExamples = [
+    { description: "If MVRV is deep in the undervalued zone, the bot buys 3× your base amount." },
+    { description: "If MVRV is near neutral, it buys your normal amount." },
+    { description: "If MVRV signals extreme overvaluation, it buys a smaller amount—or sells a portion of holdings." }
 ];
 
 export default function MvrvCycleDCAPage() {
@@ -124,14 +135,36 @@ export default function MvrvCycleDCAPage() {
         </div>;
     }
 
-    const displayHeroTitle = content?.heroTitle || "MVRV Cycle DCA";
-    const displayHeroDesc = content?.heroDescription || "On-chain cycle-based DCA for long-term growth";
-    const displayCtaText = content?.ctaText || "Start Free Trial";
-    const displayCtaLink = content?.ctaLink || "/register";
+    const safeContent = {
+        ...content,
+        heroTitle: content?.heroTitle || "MVRV Cycle DCA",
+        heroDescription: content?.heroDescription || "On-chain cycle-based DCA for long-term growth",
+        ctaText: content?.ctaText || "Start Free Trial",
+        ctaLink: content?.ctaLink || "/register",
+        whatIs: {
+            title: content?.whatIs?.title || "What is MVRV Cycle DCA?",
+            description: content?.whatIs?.description || "MVRV Cycle DCA upgrades your regular investment schedule by adding on-chain market intelligence. You still buy on your chosen schedule—daily, weekly, or monthly—but the order size is automatically adjusted based on the MVRV ratio or MVRV Z-Score, proven on-chain metrics that reveal whether the market is undervalued or overvalued."
+        },
+        howItWorks: content?.howItWorks || defaultSteps,
+        features: content?.features || defaultFeatures,
+        whoIsFor: content?.whoIsFor || defaultWhoIsFor,
+        comparison: content?.comparison || defaultComparisonData,
+        realLifeExamples: content?.realLifeExamples || defaultRealLifeExamples,
+        // Images
+        heroImage: content?.heroImage || "/images/MVRV Cycle DCA 1.png",
+        whoIsForImage1: content?.whoIsForImage1 || "/images/MVRV Cycle DCA 2.png", // Back
+        whoIsForImage2: content?.whoIsForImage2 || "/images/MVRV Cycle DCA 3.png", // Front
+    };
 
     return (
-        <>
+        <InlineEditProvider
+            initialData={safeContent}
+            apiEndpoint="/api/content/bots/mvrv-cycle-dca"
+            onSaveSuccess={(newData) => setContent(newData)}
+        >
             <Navbar />
+            <AdminToolbar />
+
             <main className="bg-white">
                 {/* Unified Background for Hero and What is Section */}
                 <div className="bg-[#F8F9FB]">
@@ -150,24 +183,30 @@ export default function MvrvCycleDCAPage() {
                                 <span className="inline-block px-3 py-1 bg-cyan-100/50 text-slate-800 rounded-full text-xs font-bold tracking-wide">
                                     UnicornX Bot
                                 </span>
-                                <h1 className="text-5xl lg:text-6xl font-extrabold text-[#00C2CC] leading-tight tracking-tight">
-                                    {displayHeroTitle}
-                                </h1>
-                                <p className="text-xl text-slate-800 font-normal max-w-lg leading-snug">
-                                    {displayHeroDesc}
-                                </p>
+                                <EditableText
+                                    path="heroTitle"
+                                    tagName="h1"
+                                    className="text-5xl lg:text-6xl font-extrabold text-[#00C2CC] leading-tight tracking-tight"
+                                    placeholder="Bot Name"
+                                />
+                                <EditableText
+                                    path="heroDescription"
+                                    tagName="p"
+                                    className="text-xl text-slate-800 font-normal max-w-lg leading-snug"
+                                    placeholder="Bot Description"
+                                />
                                 <div className="pt-4">
-                                    <Link
-                                        href={displayCtaLink}
+                                    <EditableLink
+                                        textPath="ctaText"
+                                        hrefPath="ctaLink"
                                         className="inline-block px-8 py-3 bg-[#00C2CC] text-white font-bold rounded-lg hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
-                                    >
-                                        {displayCtaText}
-                                    </Link>
+                                    />
                                 </div>
                             </div>
                             <div className="lg:w-7/12 relative flex justify-center lg:justify-end">
-                                <Image
-                                    src={content?.heroImage || "/images/MVRV Cycle DCA 1.png"}
+                                <EditableImage
+                                    path="heroImage"
+                                    fallbackSrc="/images/MVRV Cycle DCA 1.png"
                                     alt="MVRV Cycle DCA Hero"
                                     width={800}
                                     height={600}
@@ -181,10 +220,18 @@ export default function MvrvCycleDCAPage() {
                     {/* What is MVRV Cycle DCA? */}
                     <section className="py-20 px-4">
                         <div className="max-w-6xl mx-auto text-center space-y-6">
-                            <h2 className="text-4xl font-extrabold text-[#0B0F19]">What is MVRV Cycle DCA?</h2>
-                            <p className="text-slate-600 leading-loose text-lg">
-                                MVRV Cycle DCA upgrades your regular investment schedule by adding on-chain market intelligence. You still buy on your chosen schedule—daily, weekly, or monthly—but the order size is automatically adjusted based on the MVRV ratio or MVRV Z-Score, proven on-chain metrics that reveal whether the market is undervalued or overvalued.
-                            </p>
+                            <EditableText
+                                path="whatIs.title"
+                                tagName="h2"
+                                className="text-4xl font-extrabold text-[#0B0F19]"
+                                placeholder="Section Title"
+                            />
+                            <EditableText
+                                path="whatIs.description"
+                                tagName="p"
+                                className="text-slate-600 leading-loose text-lg"
+                                placeholder="Description"
+                            />
 
                             <div className="mt-12">
                                 <h3 className="text-lg font-extrabold text-[#0B0F19] mb-8 uppercase tracking-wide">This means:</h3>
@@ -222,9 +269,9 @@ export default function MvrvCycleDCAPage() {
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-                        {steps.map((step) => (
+                        {safeContent.howItWorks.map((step: any, idx: number) => (
                             <div
-                                key={step.number}
+                                key={idx}
                                 className={`bg-white border-[1.5px] border-cyan-300 rounded-[2rem] p-8 relative overflow-hidden group hover:shadow-lg transition-shadow ${step.className || ''}`}
                                 style={{
                                     backgroundImage: "url('/images/Timer DCA 6.png')",
@@ -237,17 +284,25 @@ export default function MvrvCycleDCAPage() {
                                     <div className="w-14 h-14 bg-gradient-to-br from-white to-slate-50 rounded-2xl shadow-sm flex items-center justify-center mb-6 border border-slate-100">
                                         <span className="text-3xl font-bold text-[#00C2CC]">{step.number}</span>
                                     </div>
-                                    <h3 className="text-xl font-bold text-[#0B0F19] mb-3">{step.title}</h3>
-                                    {/* @ts-ignore */}
+                                    <EditableText
+                                        path={`howItWorks[${idx}].title`}
+                                        tagName="h3"
+                                        className="text-xl font-bold text-[#0B0F19] mb-3"
+                                        placeholder="Step Title"
+                                    />
                                     {step.bullets ? (
                                         <ul className="text-slate-600 font-medium leading-relaxed list-disc list-inside space-y-1">
-                                            {/* @ts-ignore */}
-                                            {step.bullets.map((bullet, idx) => (
-                                                <li key={idx}>{bullet}</li>
+                                            {step.bullets.map((bullet: string, bIdx: number) => (
+                                                <li key={bIdx}>{bullet}</li>
                                             ))}
                                         </ul>
                                     ) : (
-                                        <p className="text-slate-600 font-medium leading-relaxed">{step.description}</p>
+                                        <EditableText
+                                            path={`howItWorks[${idx}].description`}
+                                            tagName="p"
+                                            className="text-slate-600 font-medium leading-relaxed"
+                                            placeholder="Step Description"
+                                        />
                                     )}
                                 </div>
                             </div>
@@ -276,12 +331,20 @@ export default function MvrvCycleDCAPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-12">
-                            {features.map((feature, idx) => (
+                            {safeContent.features.map((feature: any, idx: number) => (
                                 <div key={idx} className="space-y-3">
-                                    <h3 className="text-xl font-bold text-[#0B0F19]">{feature.title}</h3>
-                                    <p className="text-slate-600 leading-relaxed text-base">
-                                        {feature.description}
-                                    </p>
+                                    <EditableText
+                                        path={`features[${idx}].title`}
+                                        tagName="h3"
+                                        className="text-xl font-bold text-[#0B0F19]"
+                                        placeholder="Feature Title"
+                                    />
+                                    <EditableText
+                                        path={`features[${idx}].description`}
+                                        tagName="p"
+                                        className="text-slate-600 leading-relaxed text-base"
+                                        placeholder="Feature Description"
+                                    />
                                 </div>
                             ))}
                         </div>
@@ -301,8 +364,9 @@ export default function MvrvCycleDCAPage() {
                                 <div className="lg:w-1/2 relative h-[500px] w-full flex items-center justify-center lg:justify-start">
                                     {/* Chart Image (Back) */}
                                     <div className="absolute left-6 top-1/2 -translate-y-1/2 w-[90%] h-auto z-0 opacity-90">
-                                        <Image
-                                            src="/images/MVRV Cycle DCA 2.png"
+                                        <EditableImage
+                                            path="whoIsForImage1"
+                                            fallbackSrc="/images/MVRV Cycle DCA 2.png"
                                             alt="Chart Background"
                                             width={800}
                                             height={600}
@@ -311,8 +375,9 @@ export default function MvrvCycleDCAPage() {
                                     </div>
                                     {/* Man Image (Front) */}
                                     <div className="relative z-10 w-full h-full flex items-end justify-center lg:justify-start">
-                                        <Image
-                                            src="/images/MVRV Cycle DCA 3.png"
+                                        <EditableImage
+                                            path="whoIsForImage2"
+                                            fallbackSrc="/images/MVRV Cycle DCA 3.png"
                                             alt="Persona"
                                             width={500}
                                             height={700}
@@ -324,7 +389,7 @@ export default function MvrvCycleDCAPage() {
                                 {/* Content Section */}
                                 <div className="lg:w-1/2 space-y-8 z-10">
                                     <div className="space-y-6">
-                                        {whoIsFor.map((item, idx) => (
+                                        {safeContent.whoIsFor.map((item: any, idx: number) => (
                                             <div key={idx} className="flex items-start gap-4">
                                                 <div className="flex-shrink-0 mt-1">
                                                     <div className="w-10 h-10 rounded-full bg-[#00C2CC] flex items-center justify-center shadow-md">
@@ -332,19 +397,28 @@ export default function MvrvCycleDCAPage() {
                                                     </div>
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-[#0B0F19] text-lg">{item.title}</h3>
-                                                    <p className="text-slate-600 text-base">{item.description}</p>
+                                                    <EditableText
+                                                        path={`whoIsFor[${idx}].title`}
+                                                        tagName="h3"
+                                                        className="font-bold text-[#0B0F19] text-lg"
+                                                        placeholder="Title"
+                                                    />
+                                                    <EditableText
+                                                        path={`whoIsFor[${idx}].description`}
+                                                        tagName="p"
+                                                        className="text-slate-600 text-base"
+                                                        placeholder="Description"
+                                                    />
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                     <div className="pt-4">
-                                        <Link
-                                            href={displayCtaLink}
+                                        <EditableLink
+                                            textPath="ctaText"
+                                            hrefPath="ctaLink"
                                             className="inline-block w-full text-center px-12 py-4 bg-[#00C2CC] text-white font-bold rounded-xl hover:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20 text-lg"
-                                        >
-                                            {displayCtaText}
-                                        </Link>
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -361,21 +435,16 @@ export default function MvrvCycleDCAPage() {
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-                            <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-center min-h-[160px]">
-                                <p className="text-[#0B0F19] font-bold text-lg leading-snug">
-                                    If MVRV is deep in the undervalued zone, the bot buys 3× your base amount.
-                                </p>
-                            </div>
-                            <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-center min-h-[160px]">
-                                <p className="text-[#0B0F19] font-bold text-lg leading-snug">
-                                    If MVRV is near neutral, it buys your normal amount.
-                                </p>
-                            </div>
-                            <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-center min-h-[160px]">
-                                <p className="text-[#0B0F19] font-bold text-lg leading-snug">
-                                    If MVRV signals extreme overvaluation, it buys a smaller amount—or sells a portion of holdings.
-                                </p>
-                            </div>
+                            {safeContent.realLifeExamples.map((example: any, idx: number) => (
+                                <div key={idx} className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-center min-h-[160px]">
+                                    <EditableText
+                                        path={`realLifeExamples[${idx}].description`}
+                                        tagName="p"
+                                        className="text-[#0B0F19] font-bold text-lg leading-snug"
+                                        placeholder="Example description"
+                                    />
+                                </div>
+                            ))}
                         </div>
 
                         <div className="text-center">
@@ -404,10 +473,10 @@ export default function MvrvCycleDCAPage() {
                             <div className="col-span-3 md:col-span-3 text-center text-[#00C2CC]">MVRV Cycle DCA</div>
                         </div>
                         <div className="divide-y divide-slate-100">
-                            {comparisonData.map((row, idx) => (
+                            {safeContent.comparison.map((row: any, idx: number) => (
                                 <div key={idx} className="grid grid-cols-12 py-5 px-6 items-center hover:bg-slate-50 transition-colors">
                                     <div className="col-span-6 md:col-span-6 text-sm font-bold text-slate-900">
-                                        {row.feature}
+                                        <EditableText path={`comparison[${idx}].feature`} tagName="span" />
                                     </div>
                                     <div className="col-span-3 md:col-span-3 flex justify-center">
                                         {row.traditional ? (
@@ -438,6 +507,6 @@ export default function MvrvCycleDCAPage() {
                 </section>
             </main >
             <Footer />
-        </>
+        </InlineEditProvider>
     );
 }
