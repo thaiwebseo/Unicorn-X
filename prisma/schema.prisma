@@ -46,6 +46,7 @@ model User {
   bots          Bot[]
   orders        Order[]
   trialUsedCategories String[]   @default([]) // Track which categories user has already trialed
+  couponUsages    CouponUsage[]
 
   @@map("users")
 }
@@ -59,6 +60,7 @@ model Plan {
   priceYearly  Float
   features     String[] // Array of strings for features
   includedBots String[] @default([]) // Array of bot types included in this plan
+  isHighlighted Boolean @default(false)
   isActive     Boolean  @default(true)
 
   subscriptions Subscription[]
@@ -138,6 +140,7 @@ model PricingCategory {
   id          String   @id @default(uuid())
   name        String   @unique // e.g. 'Smart Timer DCA'
   description String?  // Description shown in Pricing tabs
+  isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -177,4 +180,35 @@ model BotContent {
   updatedAt       DateTime @updatedAt
 
   @@map("bot_contents")
+}
+
+model Coupon {
+  id              String    @id @default(uuid())
+  code            String    @unique // e.g., 'DISCOUNT50'
+  discountType    String    // 'PERCENTAGE' or 'FIXED'
+  discountValue   Float
+  expiryDate      DateTime?
+  usageLimit      Int?      // Max number of times this coupon can be used (Global)
+  limitPerUser    Int?      // Max times a single user can use this coupon (null = unlimited)
+  usageCount      Int       @default(0)
+  isActive        Boolean   @default(true)
+  stripeCouponId  String?   // Linked Stripe Coupon ID
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  usages          CouponUsage[]
+
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  usedAt    DateTime @default(now())
+
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("coupon_usages")
 }

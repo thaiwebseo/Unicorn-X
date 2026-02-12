@@ -164,6 +164,30 @@ async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
         });
 
         console.log(`✅ Webhook processed initial checkout for user ${userId}`);
+
+        // 3. Handle Coupon Usage (Post-payment)
+        const couponCode = session.metadata?.couponCode;
+        if (couponCode) {
+            try {
+                const coupon = await prisma.coupon.findUnique({ where: { code: couponCode.toUpperCase() } });
+                if (coupon) {
+                    await prisma.coupon.update({
+                        where: { id: coupon.id },
+                        data: { usageCount: { increment: 1 } }
+                    });
+
+                    await prisma.couponUsage.create({
+                        data: {
+                            couponId: coupon.id,
+                            userId: userId
+                        }
+                    });
+                    console.log(`🎟️ Recorded usage for coupon ${couponCode} by user ${userId}`);
+                }
+            } catch (err) {
+                console.error(`Failed to record coupon usage for ${couponCode}:`, err);
+            }
+        }
     } catch (e) {
         console.error('Webhook processing error:', e);
     }

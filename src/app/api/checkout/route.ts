@@ -84,7 +84,26 @@ export async function POST(req: Request) {
             : `${process.env.NEXT_PUBLIC_BASE_URL}/guided-setup/create-key?session_id={CHECKOUT_SESSION_ID}`;
 
         // Get Referral ID from body
-        const { ref } = body;
+        const { ref, couponCode } = body;
+
+        // Handle Coupons
+        let appliedStripeCoupon = null;
+        if (couponCode) {
+            const coupon = await prisma.coupon.findUnique({
+                where: { code: couponCode.toUpperCase() }
+            });
+
+            if (coupon && coupon.isActive && coupon.stripeCouponId) {
+                // Double check expiry and limit
+                const isExpired = coupon.expiryDate && new Date(coupon.expiryDate) < new Date();
+                const limitReached = coupon.usageLimit && coupon.usageCount >= coupon.usageLimit;
+
+                if (!isExpired && !limitReached) {
+                    appliedStripeCoupon = coupon.stripeCouponId;
+                    // Note: Usage count increment is handled in the Stripe Webhook to prevent counting abandoned checkouts.
+                }
+            }
+        }
 
         // Check for Trial Eligibility
         const { isTrial } = body;
@@ -118,14 +137,19 @@ export async function POST(req: Request) {
                     quantity: 1,
                 },
             ],
+            discounts: appliedStripeCoupon ? [{ coupon: appliedStripeCoupon }] : undefined,
             mode: mode,
-            subscription_data: isTrial ? {
-                trial_period_days: 7,
+            subscription_data: {
+                trial_period_days: isTrial ? 7 : undefined,
                 metadata: {
-                    isTrial: 'true',
+                    userId: user.id,
+                    planId: planId,
+                    planName: productName,
+                    planType: type,
+                    isTrial: isTrial ? 'true' : 'false',
                     category: plan.category
                 }
-            } : undefined,
+            },
             success_url: successUrl,
             cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/subscription?canceled=true`,
             customer_email: session.user.email!,
@@ -136,7 +160,8 @@ export async function POST(req: Request) {
                 planType: type,
                 refId: ref || '',
                 isTrial: isTrial ? 'true' : 'false',
-                category: plan.category
+                category: plan.category,
+                couponCode: couponCode || ''
             }
         });
 

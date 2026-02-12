@@ -5,110 +5,61 @@ import { useState, useEffect } from 'react';
 import { Check, MonitorPlay, Clock, Link2, Infinity } from 'lucide-react';
 
 type PlanTier = {
+    id: string;
     name: string;
+    category: string;
+    tier: string;
     priceMonthly: number;
     priceYearly: number;
     features: string[];
-    highlight?: boolean;
+    isHighlighted: boolean;
 };
 
-type PricingCategory = 'Smart Timer DCA' | 'Bollinger Band DCA' | 'MVRV Smart DCA' | 'Ultimate DCA Max' | 'Bundles';
-
-const categories: PricingCategory[] = [
-    'Smart Timer DCA',
-    'Bollinger Band DCA',
-    'MVRV Smart DCA',
-    'Ultimate DCA Max',
-    'Bundles'
-];
-
-const categoryDescriptions: Record<PricingCategory, string> = {
-    'Smart Timer DCA': 'Best for traders who want disciplined investing, with optional signals.',
-    'Bollinger Band DCA': 'Great for dip-hunters who want to buy when markets are statistically cheap.',
-    'MVRV Smart DCA': 'Perfect for long-term holders using on-chain data for optimal entries.',
-    'Ultimate DCA Max': 'Maximum control with safety orders and multi-level take profits.',
-    'Bundles': 'Bundle Plans – All Bots, One Subscription save 30-40%'
-};
-
-// Data from seeding script
-const pricingData: Record<PricingCategory, PlanTier[]> = {
-    'Smart Timer DCA': [
-        { name: 'Starter', priceMonthly: 14, priceYearly: 134, features: ['Time-based DCA (daily/weekly/monthly)', 'Indicators (RSI)', 'Binance'] },
-        { name: 'Pro', priceMonthly: 19, priceYearly: 182, features: ['Time-based DCA (daily/weekly/monthly)', 'Indicators (RSI, MACD, MA)', 'Binance + OKX', 'Customizable schedule'], highlight: true },
-    ],
-    'Bollinger Band DCA': [
-        { name: 'Starter', priceMonthly: 22, priceYearly: 211, features: ['BB Logic', 'Band level selection', 'Binance'] },
-        { name: 'Pro', priceMonthly: 35, priceYearly: 336, features: ['Fully customizable bands', 'Confirmation indicators', 'Binance + OKX'], highlight: true },
-    ],
-    'MVRV Smart DCA': [
-        { name: 'Starter', priceMonthly: 29, priceYearly: 278, features: ['On-chain MVRV', 'Pre-set thresholds', 'Binance'] },
-        { name: 'Pro', priceMonthly: 45, priceYearly: 430, features: ['Customizable thresholds', 'Confirmation indicators', 'Binance + OKX'], highlight: true },
-    ],
-    'Ultimate DCA Max': [
-        { name: 'Starter', priceMonthly: 47, priceYearly: 451, features: ['4 Safety Orders', 'Single-level TP', 'Binance'] },
-        { name: 'Pro', priceMonthly: 77, priceYearly: 739, features: ['8 Safety Orders', 'Two-level TP', 'Basic trailing profit'], highlight: true },
-        { name: 'Expert', priceMonthly: 127, priceYearly: 1219, features: ['14 Safety Orders', '3-level TP', 'Smart Trailing Profit', 'Binance + OKX'] },
-    ],
-    'Bundles': [
-        { name: 'Starter Bundle', priceMonthly: 49, priceYearly: 470, features: ['Smart Timer/Bollinger/MVRV Starter versions'] },
-        { name: 'Pro Bundle', priceMonthly: 79, priceYearly: 758, features: ['Pro versions of above + OKX support'], highlight: true },
-        { name: 'Expert Bundle', priceMonthly: 149, priceYearly: 1430, features: ['All Bots Pro + Ultimate DCA Max Pro + UnicornX Signal'] },
-    ]
-};
+type PricingCategory = 'Smart Timer DCA' | 'Bollinger Band DCA' | 'MVRV Smart DCA' | 'Ultimate DCA Max' | 'Bundles' | string;
 
 const Pricing = () => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
     const [activeCategory, setActiveCategory] = useState<string>('Smart Timer DCA');
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-    const [dbPlans, setDbPlans] = useState<any[]>([]);
+    const [dbPlans, setDbPlans] = useState<PlanTier[]>([]);
     const [dbCategories, setDbCategories] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Fetch Categories
+                const catsRes = await fetch('/api/pricing-categories');
+                if (catsRes.ok) {
+                    const data = await catsRes.json();
+                    setDbCategories(data);
+                    // Set initial active category if exists
+                    if (data.length > 0 && !data.find((c: any) => c.name === activeCategory)) {
+                        setActiveCategory(data[0].name);
+                    }
+                }
+
                 // Fetch Plans
                 const plansRes = await fetch('/api/plans');
                 if (plansRes.ok) {
                     const data = await plansRes.json();
                     setDbPlans(data);
                 }
-
-                // Fetch Categories
-                const catsRes = await fetch('/api/pricing-categories');
-                if (catsRes.ok) {
-                    const data = await catsRes.json();
-                    setDbCategories(data);
-                }
             } catch (error) {
                 console.error('Error fetching pricing data:', error);
             }
         };
         fetchData();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubscribe = (plan: PlanTier, isTrial = false) => {
-        setLoadingPlan(plan.name);
-
-        // Combine category with tier for full plan name (e.g., "Smart Timer DCA - Starter")
-        // Find the actual plan ID from the database plans
-        const dbPlan = dbPlans.find(p => {
-            const matchesCategory = p.category === activeCategory;
-            const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
-                p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
-                p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
-                plan.name.toLowerCase().includes(p.tier.toLowerCase());
-            return matchesCategory && tierMatches;
-        });
-
-        // Use real DB name if found, otherwise fallback to hardcoded string
-        const finalPlanName = dbPlan ? dbPlan.name : `${activeCategory} - ${plan.name}`;
+        setLoadingPlan(plan.id);
 
         // Redirect to intermediate checkout page
         const params = new URLSearchParams({
-            plan: finalPlanName,
+            plan: plan.name, // Use full name from DB
             price: isTrial ? '0.00' : (billingCycle === 'monthly' ? plan.priceMonthly.toString() : plan.priceYearly.toString()),
             type: billingCycle,
-            id: dbPlan?.id || 'monthly',
+            id: plan.id,
             isTrial: isTrial ? 'true' : 'false'
         });
 
@@ -116,11 +67,13 @@ const Pricing = () => {
     };
 
     const currentCategoryData = dbCategories.find(c => c.name === activeCategory);
-    const displayDescription = currentCategoryData?.description || (categoryDescriptions[activeCategory as PricingCategory] || '');
-    const displayCategories = dbCategories.length > 0 ? dbCategories.map(c => c.name) : categories;
+    const displayDescription = currentCategoryData?.description || '';
 
-    // Safely get plan data for categories
-    const currentPricingData = pricingData[activeCategory as PricingCategory] || [];
+    // Filter plans for the active category
+    // Sort by price (assumption: Starter < Pro < Expert)
+    const currentPricingData = dbPlans
+        .filter(p => p.category === activeCategory)
+        .sort((a, b) => a.priceMonthly - b.priceMonthly);
 
     return (
         <section id="pricing" className="pt-12 pb-24 bg-slate-100">
@@ -135,19 +88,19 @@ const Pricing = () => {
                     </p>
                 </div>
 
-                {/* Category Selector - Separate Pills */}
+                {/* Category Selector - Dynamic from DB */}
                 <div className="mt-10 flex justify-center">
                     <div className="inline-flex flex-wrap justify-center gap-2">
-                        {displayCategories.map((cat) => (
+                        {dbCategories.map((cat) => (
                             <button
-                                key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`px-5 py-3 text-sm font-medium transition-all rounded-lg ${activeCategory === cat
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.name)}
+                                className={`px-5 py-3 text-sm font-medium transition-all rounded-lg ${activeCategory === cat.name
                                     ? 'bg-white text-cyan-600 border-l-4 border-cyan-500 shadow-md'
                                     : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                                     }`}
                             >
-                                {cat}
+                                {cat.name}
                             </button>
                         ))}
                     </div>
@@ -177,7 +130,7 @@ const Pricing = () => {
                     </div>
                 </div>
 
-                {/* Billing Toggle - Pill Button Style */}
+                {/* Billing Toggle */}
                 <div className="mt-8 flex justify-center items-center">
                     <div className="inline-flex items-center bg-slate-200 rounded-full p-1">
                         <button
@@ -207,111 +160,101 @@ const Pricing = () => {
                     </div>
                 </div>
 
-                {/* Pricing Cards */}
+                {/* Pricing Cards - Dynamic Grid */}
                 <div className={`mt-12 grid grid-cols-1 gap-8 justify-items-center ${currentPricingData.length === 2
                     ? 'lg:grid-cols-2 max-w-4xl mx-auto'
-                    : 'lg:grid-cols-3'
+                    : currentPricingData.length === 1
+                        ? 'lg:grid-cols-1 max-w-md mx-auto'
+                        : 'lg:grid-cols-3'
                     }`}>
-                    {currentPricingData.map((plan) => (
-                        <div
-                            key={plan.name}
-                            className={`relative rounded-2xl p-8 flex flex-col bg-white w-full max-w-sm lg:max-w-none min-h-[420px] ${plan.highlight
-                                ? 'border-2 border-cyan-500 shadow-lg'
-                                : 'border border-slate-200'
-                                }`}
-                        >
-                            {/* Best Value Badge */}
-                            {plan.highlight && (
-                                <div className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-cyan-500 px-4 py-1 text-xs font-semibold text-white">
-                                    Best Value
-                                </div>
-                            )}
-
-                            {/* Plan Name */}
-                            <h3 className="text-2xl font-bold text-cyan-600">{plan.name}</h3>
-
-                            {/* Price */}
-                            <div className="mt-4">
-                                <div className="flex items-baseline text-slate-900">
-                                    <span className="text-5xl font-extrabold tracking-tight">
-                                        ${(() => {
-                                            const dbPlan = dbPlans.find(p => {
-                                                const matchesCategory = p.category === activeCategory;
-                                                const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
-                                                    p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
-                                                    p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
-                                                    plan.name.toLowerCase().includes(p.tier.toLowerCase());
-                                                return matchesCategory && tierMatches;
-                                            });
-                                            if (dbPlan) {
-                                                return billingCycle === 'monthly' ? dbPlan.priceMonthly.toFixed(2) : dbPlan.priceYearly.toFixed(2);
-                                            }
-                                            return billingCycle === 'monthly' ? plan.priceMonthly.toFixed(2) : plan.priceYearly.toFixed(2);
-                                        })()}
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-slate-500">
-                                    {billingCycle === 'monthly' ? 'Per Month' : 'Per Year'}
-                                </p>
-                            </div>
-
-                            {/* CTA Button */}
-                            <button
-                                onClick={() => handleSubscribe(plan)}
-                                disabled={loadingPlan === plan.name}
-                                className={`mt-6 w-full rounded-lg px-4 py-3 text-center text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${plan.highlight
-                                    ? 'bg-cyan-500 text-white hover:bg-cyan-600'
-                                    : 'bg-white text-cyan-600 border-2 border-cyan-500 hover:bg-cyan-50'
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    {currentPricingData.length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-slate-500">
+                            No plans available for this category yet.
+                        </div>
+                    ) : (
+                        currentPricingData.map((plan) => (
+                            <div
+                                key={plan.id}
+                                className={`relative rounded-2xl p-8 flex flex-col bg-white w-full max-w-sm lg:max-w-none min-h-[420px] ${plan.isHighlighted
+                                    ? 'border-2 border-cyan-500 shadow-lg'
+                                    : 'border border-slate-200'
+                                    }`}
                             >
-                                {loadingPlan === plan.name ? (
-                                    <>
-                                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        Processing...
-                                    </>
-                                ) : (
-                                    'Get Started'
+                                {/* Best Value Badge */}
+                                {plan.isHighlighted && (
+                                    <div className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-cyan-500 px-4 py-1 text-xs font-semibold text-white">
+                                        Best Value
+                                    </div>
                                 )}
-                            </button>
 
-                            {/* Free Trial Button */}
-                            {activeCategory !== 'Bundles' && (
+                                {/* Plan Name (Tier) */}
+                                <h3 className="text-2xl font-bold text-cyan-600">
+                                    {plan.tier}
+                                </h3>
+
+                                {/* Price */}
+                                <div className="mt-4">
+                                    <div className="flex items-baseline text-slate-900">
+                                        <span className="text-5xl font-extrabold tracking-tight">
+                                            ${billingCycle === 'monthly' ? plan.priceMonthly : plan.priceYearly}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-slate-500">
+                                        {billingCycle === 'monthly' ? 'Per Month' : 'Per Year'}
+                                    </p>
+                                </div>
+
+                                {/* CTA Button */}
                                 <button
-                                    onClick={() => handleSubscribe(plan, true)}
-                                    className="w-full mt-3 py-2 text-sm font-bold text-cyan-600 hover:text-cyan-700 hover:underline transition-all"
+                                    onClick={() => handleSubscribe(plan)}
+                                    disabled={loadingPlan === plan.id}
+                                    className={`mt-6 w-full rounded-lg px-4 py-3 text-center text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${plan.isHighlighted
+                                        ? 'bg-cyan-500 text-white hover:bg-cyan-600'
+                                        : 'bg-white text-cyan-600 border-2 border-cyan-500 hover:bg-cyan-50'
+                                        } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
-                                    Start 7-Day Free Trial
+                                    {loadingPlan === plan.id ? (
+                                        <>
+                                            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        'Get Started'
+                                    )}
                                 </button>
-                            )}
 
-                            {/* Features */}
-                            <div className="mt-8">
-                                <p className="font-bold text-slate-900 mb-4">Features</p>
-                                <ul className="space-y-3">
-                                    {(() => {
-                                        const dbPlan = dbPlans.find(p => {
-                                            const matchesCategory = p.category === activeCategory;
-                                            const tierMatches = p.tier.toLowerCase() === plan.name.toLowerCase() ||
-                                                p.tier.toLowerCase().replace(' bundle', '') === plan.name.toLowerCase().replace(' bundle', '') ||
-                                                p.tier.toLowerCase().includes(plan.name.toLowerCase()) ||
-                                                plan.name.toLowerCase().includes(p.tier.toLowerCase());
-                                            return matchesCategory && tierMatches;
-                                        });
-                                        const features = (dbPlan && dbPlan.features && dbPlan.features.length > 0)
-                                            ? dbPlan.features
-                                            : plan.features;
+                                {/* Bundle Auto-Cancel Note */}
+                                {(activeCategory === 'Bundles' || plan.name.toLowerCase().includes('bundle')) && (
+                                    <p className="mt-2 text-[10px] text-center text-red-500 font-medium">
+                                        *Includes auto-cancellation of duplicate single bots
+                                    </p>
+                                )}
 
-                                        return features.map((feature: string) => (
-                                            <li key={feature} className="flex items-start text-sm text-slate-600">
+                                {/* Free Trial Button */}
+                                {activeCategory !== 'Bundles' && (
+                                    <button
+                                        onClick={() => handleSubscribe(plan, true)}
+                                        className="w-full mt-3 py-2 text-sm font-bold text-cyan-600 hover:text-cyan-700 hover:underline transition-all"
+                                    >
+                                        Start 7-Day Free Trial
+                                    </button>
+                                )}
+
+                                {/* Features */}
+                                <div className="mt-8">
+                                    <p className="font-bold text-slate-900 mb-4">Features</p>
+                                    <ul className="space-y-3">
+                                        {plan.features.map((feature: string, index: number) => (
+                                            <li key={index} className="flex items-start text-sm text-slate-600">
                                                 <Check className="mr-3 h-5 w-5 flex-shrink-0 text-cyan-500" />
                                                 {feature}
                                             </li>
-                                        ));
-                                    })()}
-                                </ul>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
 
                 {/* All Plans Include Section */}

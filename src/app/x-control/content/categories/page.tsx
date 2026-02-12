@@ -10,6 +10,7 @@ interface Category {
     name: string;
     description: string | null;
     sortOrder: number;
+    isActive: boolean;
 }
 
 export default function CategoriesPage() {
@@ -18,7 +19,7 @@ export default function CategoriesPage() {
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Partial<Category>>({});
     const [isCreating, setIsCreating] = useState(false);
-    const [newCategory, setNewCategory] = useState({ name: '', description: '', sortOrder: 0 });
+    const [newCategory, setNewCategory] = useState({ name: '', description: '', sortOrder: 0, isActive: true });
 
     const fetchCategories = async () => {
         setIsLoading(true);
@@ -56,7 +57,7 @@ export default function CategoriesPage() {
             if (res.ok) {
                 Swal.fire('Success', 'Category created', 'success');
                 setIsCreating(false);
-                setNewCategory({ name: '', description: '', sortOrder: 0 });
+                setNewCategory({ name: '', description: '', sortOrder: 0, isActive: true });
                 fetchCategories();
             } else {
                 throw new Error('Failed to create');
@@ -83,6 +84,25 @@ export default function CategoriesPage() {
             }
         } catch (error) {
             Swal.fire('Error', 'Failed to update category', 'error');
+        }
+    };
+
+    const handleUpdateStatus = async (id: string, newStatus: boolean) => {
+        try {
+            const res = await fetch('/api/admin/pricing-categories', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, isActive: newStatus })
+            });
+
+            if (res.ok) {
+                // Update local state for immediate feedback
+                setCategories(prev => prev.map(c => c.id === id ? { ...c, isActive: newStatus } : c));
+            } else {
+                throw new Error('Failed to update status');
+            }
+        } catch (error) {
+            Swal.fire('Error', 'Failed to update status', 'error');
         }
     };
 
@@ -173,6 +193,18 @@ export default function CategoriesPage() {
                                 className="w-full px-3 py-2 rounded-lg border-cyan-200 focus:ring-cyan-500 text-center"
                             />
                         </div>
+                        <div className="md:col-span-1">
+                            <label className="block text-xs font-bold text-cyan-700 mb-1">Status</label>
+                            <label className="relative inline-flex items-center cursor-pointer pt-2">
+                                <input
+                                    type="checkbox"
+                                    checked={newCategory.isActive}
+                                    onChange={e => setNewCategory({ ...newCategory, isActive: e.target.checked })}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[10px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
                         <div className="md:col-span-2 flex gap-2 pt-6">
                             <button onClick={handleCreate} className="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700">Save</button>
                             <button onClick={() => setIsCreating(false)} className="px-3 bg-white text-slate-500 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Cancel</button>
@@ -189,6 +221,7 @@ export default function CategoriesPage() {
                             <th className="px-6 py-4 w-16 text-center">Order</th>
                             <th className="px-6 py-4 w-1/4">Name</th>
                             <th className="px-6 py-4">Description</th>
+                            <th className="px-6 py-4 w-24 text-center">Status</th>
                             <th className="px-6 py-4 w-32 text-center">Actions</th>
                         </tr>
                     </thead>
@@ -233,6 +266,28 @@ export default function CategoriesPage() {
                                                 className="w-full px-3 py-1 border rounded"
                                             />
                                         ) : cat.description}
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => {
+                                                if (isEditing === cat.id) {
+                                                    setEditForm(prev => ({ ...prev, isActive: !prev.isActive }));
+                                                } else {
+                                                    handleUpdateStatus(cat.id, !cat.isActive);
+                                                }
+                                            }}
+                                            className={`relative inline-flex items-center cursor-pointer transition-opacity ${isEditing !== cat.id ? 'hover:opacity-80' : ''}`}
+                                        >
+                                            <div className={`w-11 h-6 rounded-full transition-colors ${((isEditing === cat.id ? editForm.isActive : cat.isActive))
+                                                ? 'bg-cyan-500'
+                                                : 'bg-slate-300'
+                                                }`}>
+                                                <div className={`absolute top-[2px] left-[2px] bg-white border border-gray-300 rounded-full h-5 after:w-5 transition-transform ${((isEditing === cat.id ? editForm.isActive : cat.isActive))
+                                                    ? 'translate-x-[20px]'
+                                                    : 'translate-x-0'
+                                                    }`} style={{ width: '20px' }}></div>
+                                            </div>
+                                        </button>
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex items-center justify-center gap-2">

@@ -16,6 +16,7 @@ interface Plan {
     priceYearly: number;
     features: string[];
     includedBots?: string[];
+    isHighlighted: boolean;
     isActive: boolean;
 }
 
@@ -36,6 +37,7 @@ export default function PackageManagement() {
         priceYearly: 0,
         featuresString: '', // Helper for textarea
         includedBots: [] as string[],
+        isHighlighted: false,
         isActive: true
     });
     const [saving, setSaving] = useState(false);
@@ -70,6 +72,7 @@ export default function PackageManagement() {
                 priceYearly: plan.priceYearly,
                 featuresString: plan.features.join('\n'),
                 includedBots: plan.includedBots || [],
+                isHighlighted: plan.isHighlighted || false,
                 isActive: plan.isActive
             });
         } else {
@@ -82,6 +85,7 @@ export default function PackageManagement() {
                 priceYearly: 0,
                 featuresString: '',
                 includedBots: [],
+                isHighlighted: false,
                 isActive: true
             });
         }
@@ -609,6 +613,24 @@ export default function PackageManagement() {
                                     </p>
                                 </div>
                             )}
+
+                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                <div>
+                                    <label className="text-sm font-bold text-slate-700 block">Highlight (Best Value)</label>
+                                    <p className="text-xs text-slate-500">
+                                        Mark this plan as "Best Value" with a special badge and border.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, isHighlighted: !formData.isHighlighted })}
+                                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 ${formData.isHighlighted ? 'bg-cyan-500' : 'bg-slate-300'}`}
+                                >
+                                    <span
+                                        className={`${formData.isHighlighted ? 'translate-x-6' : 'translate-x-1'} inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm`}
+                                    />
+                                </button>
+                            </div>
 
                             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
                                 <div>

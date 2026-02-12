@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package, Book, Layers } from 'lucide-react';
+import { LayoutDashboard, Users, Bot, CreditCard, Settings, LogOut, Package, Book, Layers, List } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -14,8 +14,9 @@ export default function AdminSidebar() {
         { href: '/x-control/bots', label: 'Bot Management', icon: Bot },
         { href: '/x-control/subscriptions', label: 'Subscriptions', icon: CreditCard },
         { href: '/x-control/packages', label: 'Packages', icon: Package },
+        { href: '/x-control/content/categories', label: 'Pricing Categories', icon: List },
         { href: '/x-control/guides', label: 'Guides', icon: Book },
-        { href: '/x-control/content', label: 'Site Content', icon: Layers },
+        { href: '/x-control/coupons', label: 'Coupons', icon: CreditCard },
         // { href: '/x-control/settings', label: 'Settings', icon: Settings },
     ];
 

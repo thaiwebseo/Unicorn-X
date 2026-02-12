@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
     try {
         const categories = await prisma.pricingCategory.findMany({
+            where: { isActive: true },
             orderBy: { sortOrder: 'asc' }
         });
 

@@ -25,7 +25,10 @@ function CheckoutContent() {
     const referralCode = searchParams.get('ref') || ''; // Get ref code
 
     const [loading, setLoading] = useState(false);
-    const [coupon, setCoupon] = useState('');
+    const [couponInput, setCouponInput] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+    const [discountAmount, setDiscountAmount] = useState(0);
+    const [isValidating, setIsValidating] = useState(false);
     const [isPrivacyChecked, setIsPrivacyChecked] = useState(false);
 
     // Billing Info State
@@ -59,6 +62,50 @@ function CheckoutContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, router, session]);
 
+    const handleApplyCoupon = async () => {
+        if (!couponInput) return;
+        setIsValidating(true);
+        try {
+            const res = await fetch('/api/coupons/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: couponInput })
+            });
+
+            if (res.ok) {
+                const couponData = await res.json();
+                setAppliedCoupon(couponData);
+
+                // Calculate discount
+                let amount = 0;
+                if (couponData.discountType === 'PERCENTAGE') {
+                    amount = (planPrice * couponData.discountValue) / 100;
+                } else {
+                    amount = couponData.discountValue;
+                }
+                setDiscountAmount(amount);
+                MySwal.fire({
+                    icon: 'success',
+                    title: 'Coupon Applied!',
+                    text: `You saved ${couponData.discountType === 'PERCENTAGE' ? `${couponData.discountValue}%` : `$${couponData.discountValue}`}`,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            } else {
+                const error = await res.text();
+                throw new Error(error);
+            }
+        } catch (error: any) {
+            MySwal.fire('Error', error.message || 'Invalid coupon code', 'error');
+            setAppliedCoupon(null);
+            setDiscountAmount(0);
+        } finally {
+            setIsValidating(false);
+        }
+    };
+
+    const finalTotalPrice = Math.max(0, planPrice - discountAmount);
+
     if (status === 'loading') {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
     }
@@ -89,7 +136,8 @@ function CheckoutContent() {
                     lastName,
                     isRenewal,
                     isTrial,
-                    ref: referralCode // Forward to API
+                    ref: referralCode, // Forward to API
+                    couponCode: appliedCoupon?.code
                 }),
             });
 
@@ -236,6 +284,13 @@ function CheckoutContent() {
                                 <div>
                                     <p className="text-sm text-slate-500">Your currently selected plan</p>
                                     <h3 className="text-lg font-bold text-cyan-600">{planName}</h3>
+
+                                    {/* Bundle Warning */}
+                                    {planName.toLowerCase().includes('bundle') && (
+                                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 leading-relaxed">
+                                            <strong>⚠️ Note:</strong> If you have active single bot subscriptions, purchasing this Bundle will automatically replace them to prevent double charging.
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-between items-center text-sm">
@@ -244,7 +299,9 @@ function CheckoutContent() {
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-600">Coupon Discount Amount</span>
-                                    <span className="font-bold">0.00</span>
+                                    <span className={`font-bold ${discountAmount > 0 ? 'text-emerald-500' : ''}`}>
+                                        {discountAmount > 0 ? `- $${discountAmount.toFixed(2)}` : '0.00'}
+                                    </span>
                                 </div>
 
                                 <div>
@@ -252,20 +309,40 @@ function CheckoutContent() {
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
-                                            value={coupon}
-                                            onChange={(e) => setCoupon(e.target.value)}
+                                            value={couponInput}
+                                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                                            disabled={!!appliedCoupon || isValidating}
                                             placeholder="Enter coupon code"
-                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-cyan-500"
+                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-cyan-500 disabled:bg-slate-50 disabled:text-slate-400"
                                         />
-                                        <button className="px-4 py-2 bg-cyan-500 text-white text-sm font-bold rounded-lg hover:bg-cyan-600">
-                                            Apply
-                                        </button>
+                                        {appliedCoupon ? (
+                                            <button
+                                                onClick={() => { setAppliedCoupon(null); setDiscountAmount(0); setCouponInput(''); }}
+                                                className="px-4 py-2 bg-slate-100 text-slate-500 text-sm font-bold rounded-lg hover:bg-slate-200 transition-all"
+                                            >
+                                                Remove
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={handleApplyCoupon}
+                                                disabled={isValidating || !couponInput}
+                                                className="px-4 py-2 bg-cyan-500 text-white text-sm font-bold rounded-lg hover:bg-cyan-600 transition-all disabled:opacity-50"
+                                            >
+                                                {isValidating ? '...' : 'Apply'}
+                                            </button>
+                                        )}
                                     </div>
+                                    {appliedCoupon && (
+                                        <p className="mt-2 text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                            <CheckCircle2 size={12} />
+                                            Coupon "{appliedCoupon.code}" applied successfully!
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
                                     <span className="font-bold text-slate-800">Total</span>
-                                    <span className="text-2xl font-extrabold text-cyan-500">${planPrice.toFixed(2)}</span>
+                                    <span className="text-2xl font-extrabold text-cyan-500">${finalTotalPrice.toFixed(2)}</span>
                                 </div>
                             </div>
 

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, category, tier, priceMonthly, priceYearly, features, isActive } = body;
+        const { name, category, tier, priceMonthly, priceYearly, features, isActive, isHighlighted } = body;
 
         // Basic validation
         if (!name || !category || !tier || priceMonthly === undefined || priceYearly === undefined) {
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
                 priceYearly: parseFloat(priceYearly),
                 features: features || [],
                 includedBots: body.includedBots || [],
+                isHighlighted: isHighlighted || false,
                 isActive: isActive ?? true
             }
         });
@@ -74,7 +75,7 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
-        const { id, name, category, tier, priceMonthly, priceYearly, features, includedBots, isActive } = body;
+        const { id, name, category, tier, priceMonthly, priceYearly, features, includedBots, isActive, isHighlighted } = body;
 
         if (!id) {
             return new NextResponse('Plan ID required', { status: 400 });
@@ -90,6 +91,7 @@ export async function PUT(req: Request) {
                 priceYearly: priceYearly !== undefined ? parseFloat(priceYearly) : undefined,
                 features,
                 includedBots,
+                isHighlighted,
                 isActive
             }
         });

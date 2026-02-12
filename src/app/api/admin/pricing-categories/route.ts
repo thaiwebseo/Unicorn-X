@@ -13,6 +13,7 @@ export async function GET() {
         }
 
         const categories = await prisma.pricingCategory.findMany({
+            where: { isActive: true },
             orderBy: { sortOrder: 'asc' }
         });
 
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name, description, sortOrder } = body;
+        const { name, description, sortOrder, isActive } = body;
 
         if (!name) {
             return new NextResponse('Name is required', { status: 400 });
@@ -42,7 +43,8 @@ export async function POST(req: Request) {
             data: {
                 name,
                 description,
-                sortOrder: sortOrder || 0
+                sortOrder: sortOrder || 0,
+                isActive: isActive !== undefined ? isActive : true
             }
         });
 
@@ -62,7 +64,7 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
-        const { id, name, description, sortOrder } = body;
+        const { id, name, description, sortOrder, isActive } = body;
 
         if (!id) {
             return new NextResponse('ID is required', { status: 400 });
@@ -73,7 +75,8 @@ export async function PUT(req: Request) {
             data: {
                 name,
                 description,
-                sortOrder
+                sortOrder,
+                isActive
             }
         });
 
