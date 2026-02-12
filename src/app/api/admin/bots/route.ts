@@ -40,7 +40,6 @@ export async function GET() {
 
             // Find best matching subscription
             let bestSub: any = null;
-            let minTimeDiff = Infinity;
 
             userSubs.forEach((sub: any) => {
                 let targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
@@ -64,29 +63,48 @@ export async function GET() {
                 const normalizedBotName = bot.name.replace(/\s\(Trial\)$/, '');
 
                 if (targets.includes(normalizedBotName)) {
-                    // Match found! Identify closest creation time (optional, but good for accuracy)
-                    // But simplified: just take the most recent active one if multiple match
-                    // Since subs are ordered by endDate desc, the first one is usually the active/renewed one.
-
-                    // Simple logic: If we haven't found a match yet, or this one ends later?
-                    // Let's stick to the time diff logic if we want parity, 
-                    // or just take the first matching Active one.
-
                     if (!bestSub) bestSub = sub;
                 }
             });
 
-            // If no match by name, fallback to first active sub (legacy behavior) 
-            // OR leave empty? Better leave empty to avoid confusion.
-            // But for safety, let's allow fallback if it's a single bot plan
-            if (!bestSub && userSubs.length > 0) {
-                // Try loose matching
+            // Fallback for Trial bots in 'RUNNING' state that might be matched to CANCELLED/EXPIRED subs
+            // or if no match found yet.
+            if (!bestSub && bot.status === 'RUNNING') {
+                // If it's a Trial bot, try to find ANY active subscription that matches the plan name
+                // ignoring the specific "Trial" part if needed
+                const normalizedName = bot.name.replace(/\s\(Trial\)$/, '');
+                bestSub = userSubs.find((s: any) =>
+                    s.status === 'ACTIVE' &&
+                    (s.plan.name === bot.name || s.plan.name === normalizedName)
+                );
+            }
+
+            // Determine if we should show dates
+            // 1. If ActivatedAt is present, ALWAYS show dates (Time is ticking)
+            // 2. If Bot is RUNNING, ALWAYS show dates (Legacy/Trial support where activatedAt might be missing)
+            // 3. User requested "This one hasn't set API yet" -> If status is WAITING_FOR_SETUP, maybe hide it?
+            //    BUT if the subscription is ticking (activatedAt exists), we MUST show it because it expires.
+            //    The user's confusion comes from "Waiting for Setup" + "Dates".
+            //    However, from a billing perspective, if they bought it and activated it, it expires.
+            //    Let's trust `activatedAt`.
+
+            let startDate = null;
+            let endDate = null;
+
+            if (bestSub) {
+                if (bestSub.activatedAt) {
+                    startDate = bestSub.startDate;
+                    endDate = bestSub.endDate;
+                } else if (bot.status === 'RUNNING') { // Fallback for running bots without activatedAt
+                    startDate = bestSub.startDate;
+                    endDate = bestSub.endDate;
+                }
             }
 
             return {
                 ...bot,
-                startDate: bestSub?.startDate || null,
-                endDate: bestSub?.endDate || null,
+                startDate,
+                endDate,
                 sourcePlan: bestSub?.plan?.name || 'Unknown',
                 isBundle: bestSub?.plan?.category === 'Bundles' || false
             };
@@ -102,7 +120,6 @@ export async function GET() {
             if (emailComparison !== 0) return emailComparison;
 
             // Secondary: Source Plan (Bundle)
-            // Empty plans go last? Or first? Let's say last for consistency
             const planA = a.sourcePlan || '';
             const planB = b.sourcePlan || '';
             const planComparison = planA.localeCompare(planB);
@@ -129,17 +146,16 @@ export async function PUT(req: Request) {
 
         const { botId, status, endDate } = await req.json();
 
-        // 1. Get the Bot and its User's Active Subscription
+        // 1. Get the Bot and its User's Active/Cancelled Subscriptions
         const bot = await prisma.bot.findUnique({
             where: { id: botId },
             include: {
                 user: {
                     include: {
                         subscriptions: {
-                            where: { status: 'ACTIVE' },
+                            where: { status: { in: ['ACTIVE', 'CANCELLED'] } },
                             include: { plan: true },
-                            orderBy: { endDate: 'desc' },
-                            take: 1
+                            orderBy: { endDate: 'desc' }
                         }
                     }
                 }
@@ -148,38 +164,62 @@ export async function PUT(req: Request) {
 
         if (!bot) return new NextResponse('Bot not found', { status: 404 });
 
+        // Find the specific matching subscription for this bot
+        let matchedSub: any = null;
+        const userSubs = bot.user.subscriptions || [];
+
+        userSubs.forEach((sub: any) => {
+            let targets = sub.plan.includedBots && sub.plan.includedBots.length > 0
+                ? [...sub.plan.includedBots]
+                : [];
+
+            if (targets.length === 0 && sub.plan.category === 'Bundles') {
+                const tier = sub.plan.tier.toLowerCase();
+                if (tier.includes('starter')) {
+                    targets = ['Bollinger Band DCA - Starter', 'Smart Timer DCA - Starter', 'MVRV Smart DCA - Starter'];
+                } else if (tier.includes('pro')) {
+                    targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro'];
+                } else if (tier.includes('expert')) {
+                    targets = ['Bollinger Band DCA - Pro', 'Smart Timer DCA - Pro', 'MVRV Smart DCA - Pro', 'Ultimate DCA Max - Pro'];
+                }
+            }
+            if (targets.length === 0) targets = [sub.plan.name];
+
+            const normalizedBotName = bot.name.replace(/\s\(Trial\)$/, '');
+            if (targets.includes(normalizedBotName)) {
+                if (!matchedSub) matchedSub = sub;
+            }
+        });
+
+        if (!matchedSub) {
+            // Fallback: If no direct match, try active one
+            matchedSub = userSubs.find(s => s.status === 'ACTIVE');
+        }
+
         // Logic Implementation:
         // A. Handle Expiration Date Update
-        if (endDate) {
-            const subscription = bot.user.subscriptions[0];
-            if (subscription) {
-                await prisma.subscription.update({
-                    where: { id: subscription.id },
-                    data: { endDate: new Date(endDate) }
-                });
-            } else {
-                return new NextResponse('No active subscription found to update date', { status: 400 });
-            }
+        if (endDate && matchedSub) {
+            await prisma.subscription.update({
+                where: { id: matchedSub.id },
+                data: { endDate: new Date(endDate) }
+            });
         }
 
         // B. Handle Status Update
         if (status) {
-            if (status === 'RUNNING') {
-                const subscription = bot.user.subscriptions[0] as any;
-                if (subscription && !subscription.activatedAt) {
-                    const now = new Date();
-                    const originalDuration = subscription.endDate.getTime() - subscription.startDate.getTime();
-                    const newEndDate = new Date(now.getTime() + originalDuration);
+            if (status === 'RUNNING' && matchedSub && !matchedSub.activatedAt) {
+                const now = new Date();
+                const originalDuration = matchedSub.endDate.getTime() - matchedSub.startDate.getTime();
+                const newEndDate = new Date(now.getTime() + originalDuration);
 
-                    await prisma.subscription.update({
-                        where: { id: subscription.id },
-                        data: {
-                            startDate: now,
-                            endDate: newEndDate,
-                            activatedAt: now
-                        }
-                    });
-                }
+                await prisma.subscription.update({
+                    where: { id: matchedSub.id },
+                    data: {
+                        startDate: now,
+                        endDate: newEndDate,
+                        activatedAt: now
+                    }
+                });
             }
 
             await prisma.bot.update({

@@ -91,10 +91,18 @@ export async function GET() {
                 // Instead, we just use it. If multiple bots match, they'll all pick the closest sub.
                 // Since we order subs by endDate desc, this is usually what we want.
 
+                // Check for expiration
+                const isExpired = sub.endDate && new Date(sub.endDate) < new Date();
+
+                // If expired, we should return SUSPENDED status to frontend
+                // (Optional: We could also trigger a DB update here, but let's keep GET safe for now)
+                const effectiveStatus = isExpired ? 'SUSPENDED' : bot.status;
+
                 return {
                     ...bot,
+                    status: effectiveStatus,
                     expirationDate: sub.endDate || null,
-                    isActivated: !!sub.activatedAt
+                    isActivated: !!sub.activatedAt && !isExpired
                 };
             }
 

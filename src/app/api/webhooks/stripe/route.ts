@@ -99,6 +99,8 @@ async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
             orderBy: { endDate: 'desc' }
         });
 
+        const isTrial = session.metadata?.isTrial === 'true';
+
         if (existingSubForPlan) {
             // RENEWAL
             const now = new Date();
@@ -112,13 +114,21 @@ async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
                 data: {
                     status: 'ACTIVE',
                     endDate: newEndDate,
-                    stripeSessionId: sessionId
+                    stripeSessionId: sessionId,
+                    isTrial: false // Renewal is never a trial
                 }
             });
         } else {
-            // NEW
-            const endDate = new Date();
-            endDate.setMonth(endDate.getMonth() + durationMonths);
+            // NEW SUBSCRIPTION
+            let endDate = new Date();
+
+            if (isTrial) {
+                // FIXED: Trial is exactly 7 days
+                endDate.setDate(endDate.getDate() + 7);
+            } else {
+                // Normal Plan
+                endDate.setMonth(endDate.getMonth() + durationMonths);
+            }
 
             await prisma.subscription.create({
                 data: {
@@ -127,7 +137,8 @@ async function handlePaymentSuccess(session: Stripe.Checkout.Session) {
                     status: 'ACTIVE',
                     startDate: new Date(),
                     endDate,
-                    stripeSessionId: sessionId
+                    stripeSessionId: sessionId,
+                    isTrial: isTrial
                 }
             });
 
