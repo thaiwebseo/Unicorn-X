@@ -209,17 +209,25 @@ export async function PUT(req: Request) {
         if (status) {
             if (status === 'RUNNING' && matchedSub && !matchedSub.activatedAt) {
                 const now = new Date();
-                const originalDuration = matchedSub.endDate.getTime() - matchedSub.startDate.getTime();
-                const newEndDate = new Date(now.getTime() + originalDuration);
+                // Ensure startDate and endDate are valid Date objects
+                const startDate = new Date(matchedSub.startDate);
+                const endDate = new Date(matchedSub.endDate);
 
-                await prisma.subscription.update({
-                    where: { id: matchedSub.id },
-                    data: {
-                        startDate: now,
-                        endDate: newEndDate,
-                        activatedAt: now
-                    }
-                });
+                if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                    const originalDuration = endDate.getTime() - startDate.getTime();
+                    // Default to 30 days if duration calculation fails or is zero/negative (sanity check)
+                    const durationToAdd = originalDuration > 0 ? originalDuration : 30 * 24 * 60 * 60 * 1000;
+                    const newEndDate = new Date(now.getTime() + durationToAdd);
+
+                    await prisma.subscription.update({
+                        where: { id: matchedSub.id },
+                        data: {
+                            startDate: now,
+                            endDate: newEndDate,
+                            activatedAt: now
+                        }
+                    });
+                }
             }
 
             await prisma.bot.update({

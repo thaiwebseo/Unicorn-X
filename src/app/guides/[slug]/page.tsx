@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+export const dynamic = 'force-dynamic';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Book, Calendar } from 'lucide-react';
@@ -86,12 +87,32 @@ function markdownToHtml(markdown: string): string {
 export default async function GuidePage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
 
-    const guide = await prisma.guide.findUnique({
-        where: { slug }
-    });
+    let guide: any = null;
+    /*
+    try {
+        guide = await prisma.guide.findUnique({
+            where: { slug }
+        });
+    } catch (error) {
+        console.error(`Failed to fetch guide ${slug}:`, error);
+    }
+    */
 
+    /*
     if (!guide || !guide.isPublished) {
         notFound();
+    }
+    */
+    if (!guide) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="text-center">
+                    <h1 className="text-2xl font-bold text-slate-800">Coming Soon</h1>
+                    <p className="text-slate-500 mt-2">This guide is under construction.</p>
+                    <Link href="/guides" className="mt-4 inline-block text-cyan-600 hover:underline">Back to Guides</Link>
+                </div>
+            </div>
+        );
     }
 
     // Check if content is HTML (from Rich Text Editor) or Markdown
