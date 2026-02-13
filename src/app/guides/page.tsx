@@ -25,7 +25,6 @@ export const dynamic = 'force-dynamic';
 
 export default async function GuidesPage() {
     let guides: any[] = [];
-    /*
     try {
         guides = await prisma.guide.findMany({
             where: { isPublished: true },
@@ -36,10 +35,9 @@ export default async function GuidesPage() {
         });
     } catch (error) {
         console.error("Failed to fetch guides:", error);
-        // Fallback to empty array to allow build to pass
+        // Fallback to empty array
         guides = [];
     }
-    */
 
     // Group by category
     const groupedGuides: { [key: string]: typeof guides } = {};

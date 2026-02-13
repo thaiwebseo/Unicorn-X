@@ -88,7 +88,6 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     const { slug } = await params;
 
     let guide: any = null;
-    /*
     try {
         guide = await prisma.guide.findUnique({
             where: { slug }
@@ -96,7 +95,6 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     } catch (error) {
         console.error(`Failed to fetch guide ${slug}:`, error);
     }
-    */
 
     /*
     if (!guide || !guide.isPublished) {
