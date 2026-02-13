@@ -139,17 +139,19 @@ export async function POST(req: Request) {
             ],
             discounts: appliedStripeCoupon ? [{ coupon: appliedStripeCoupon }] : undefined,
             mode: mode,
-            subscription_data: {
-                trial_period_days: isTrial ? 7 : undefined,
-                metadata: {
-                    userId: user.id,
-                    planId: planId,
-                    planName: productName,
-                    planType: type,
-                    isTrial: isTrial ? 'true' : 'false',
-                    category: plan.category
+            ...(mode === 'subscription' ? {
+                subscription_data: {
+                    trial_period_days: isTrial ? 7 : undefined,
+                    metadata: {
+                        userId: user.id,
+                        planId: planId,
+                        planName: productName,
+                        planType: type,
+                        isTrial: isTrial ? 'true' : 'false',
+                        category: plan.category
+                    }
                 }
-            },
+            } : {}),
             success_url: successUrl,
             cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/subscription?canceled=true`,
             customer_email: session.user.email!,
